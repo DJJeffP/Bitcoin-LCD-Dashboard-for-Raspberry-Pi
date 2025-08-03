@@ -28,7 +28,7 @@ It features a bold BTC price, real-time clock, and date, all overlayed on a beau
 ### 1. **Clone this repository**
 
 ```sh
-git clone https://github.com/DJJeffP/btc-lcd-dashboard.git
+git clone https://github.com/DJJeffP/Bitcoin-LCD-Dashboard-for-Raspberry-Pi.git
 cd btc-lcd-dashboard
 ```
 
@@ -102,4 +102,5 @@ MIT License
 ---
 
 ### Enjoy your nerdy Bitcoin dashboard! 🚀
+
 
