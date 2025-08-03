@@ -34,7 +34,7 @@
       "color": "#E91E63",
       "coingecko_id": "minotari-tari",
       "binance_symbol": null,
-      "show": true
+      "show": false
     },
     {
       "id": "sol",
@@ -61,7 +61,7 @@
       "color": "#C9A75A",
       "coingecko_id": "qubic",
       "binance_symbol": null,
-      "show": true
+      "show": false
     },
     {
       "id": "bch",
