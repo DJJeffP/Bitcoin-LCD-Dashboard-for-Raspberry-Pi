@@ -1,18 +1,19 @@
 import time
 import json
 import os
+import threading
 import requests
 from PIL import Image, ImageDraw, ImageFont
 
 FRAMEBUFFER = "/dev/fb1"
 WIDTH, HEIGHT = 480, 320
-debug=True
 
 # Configuratie
 CONFIG_FILE = "coins.json"
 BG_FOLDER = "backgrounds"
 BG_FALLBACK = os.path.join(BG_FOLDER, "btc-bg.png")
 ROTATE_SECS = 20
+PRICE_UPDATE_SECS = 60  # Cache verversen
 
 # Fonts
 FONT_BIG = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -29,38 +30,31 @@ def load_coins(config_file=CONFIG_FILE):
     coins = [coin for coin in cfg.get("coins", []) if coin.get("show", True)]
     return coins
 
-import requests
+# --- Globale prijs-cache ---
+price_cache = {}
+price_cache_lock = threading.Lock()
 
-# Globale cache voor laatste bekende prijzen
-last_known_prices = {}
+def price_updater(coins):
+    while True:
+        for coin in coins:
+            coingecko_id = coin.get("coingecko_id", coin.get("id"))
+            try:
+                url = f"https://api.coingecko.com/api/v3/simple/price?ids={coingecko_id}&vs_currencies=usd"
+                r = requests.get(url, timeout=8)
+                price = r.json()[coingecko_id]["usd"]
+                with price_cache_lock:
+                    price_cache[coingecko_id] = float(price)
+                print(f"[INFO] Updated {coin['symbol']} price: {price}")
+            except Exception as e:
+                print(f"[WARNING] {coin['symbol']} API error: {e}")
+        time.sleep(PRICE_UPDATE_SECS)
 
-def get_price(coin, debug=False):
+def get_cached_price(coin):
     coingecko_id = coin.get("coingecko_id", coin.get("id"))
-    try:
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coingecko_id}&vs_currencies=usd"
-        r = requests.get(url, timeout=8)
-        # Debug: print altijd de API response voor deze coin
-        if debug:
-            print(f"[DEBUG] {coin['symbol']} API response: {r.text}")
-        price = r.json()[coingecko_id]["usd"]
-        # Sla op als laatste bekende prijs
-        last_known_prices[coingecko_id] = float(price)
-        return float(price)
-    except Exception as e:
-        # Debug: print error, en geef de laatst bekende prijs terug
-        if debug:
-            print(f"[DEBUG] Error getting price for {coingecko_id}: {e}")
-        # Fallback: laatst bekende prijs
-        if coingecko_id in last_known_prices:
-            return last_known_prices[coingecko_id]
-        return None  # bij allereerste keer geen prijs
-
-# Voorbeeld van gebruik:
-# price = get_price(coin, debug=True)
-
+    with price_cache_lock:
+        return price_cache.get(coingecko_id)
 
 def hex_to_rgb(hex_color, fallback=(247,147,26)):
-    # "#FF6600" -> (255,102,0)
     try:
         h = hex_color.lstrip("#")
         return tuple(int(h[i:i+2], 16) for i in (0,2,4))
@@ -72,7 +66,6 @@ def clear_framebuffer():
         f.write(bytearray([0x00, 0x00] * WIDTH * HEIGHT))
 
 def draw_dashboard(btc_price, btc_color, coin, coin_price):
-    # BTC background (of fallback)
     coin_id = coin["id"]
     coin_bg = os.path.join(BG_FOLDER, f"{coin_id}-bg.png")
     if not os.path.isfile(coin_bg):
@@ -94,8 +87,6 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
     price_text = "$" + (f"{btc_price:,.2f}" if btc_price is not None else "N/A")
     label_w, label_h = draw.textbbox((0, 0), label, font=font_main)[2:]
     price_w, price_h = draw.textbbox((0, 0), price_text, font=font_value)[2:]
-
-    # BTC staat hoger in beeld en naar rechts voor ruimte
     right_offset = 60
     btc_label_y = int(HEIGHT * 0.35) - label_h
     btc_price_y = btc_label_y + label_h + 5
@@ -103,14 +94,12 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
     draw.text(((WIDTH - price_w)//2 + right_offset, btc_price_y), price_text, font=font_value, fill=(255,255,255))
 
     # ---- Andere coin centraal onderin beeld (rotating) ----
-    # Alleen tonen als niet BTC
     if coin["id"] != "btc":
         c_label = coin["symbol"]
         c_color = hex_to_rgb(coin["color"])
         c_price = "$" + (f"{coin_price:,.2f}" if coin_price is not None else "N/A")
         c_label_w, c_label_h = draw.textbbox((0, 0), c_label, font=font_main)[2:]
         c_price_w, c_price_h = draw.textbbox((0, 0), c_price, font=font_value)[2:]
-        # Centraal iets onder BTC
         y_offset = int(HEIGHT * 0.75)
         c_label_y = y_offset - c_label_h
         c_price_y = c_label_y + c_label_h + 5
@@ -137,7 +126,11 @@ def main():
     coins = load_coins()
     btc_coin = next(c for c in coins if c["id"] == "btc")
     btc_color = hex_to_rgb(btc_coin["color"])
-    btc_price = get_price(btc_coin)
+
+    # Start background price updater
+    t = threading.Thread(target=price_updater, args=(coins,), daemon=True)
+    t.start()
+
     last_rot_time = 0
     coin_index = 0
 
@@ -148,9 +141,8 @@ def main():
             coin_index = (coin_index + 1) % len(coins)
             last_rot_time = now
         show_coin = coins[coin_index]
-        # BTC altijd tonen als hoofdcoin (bovenin), maar roteren de ondercoin (behalve als het btc is, dan alleen BTC)
-        show_coin_price = get_price(show_coin) if show_coin["id"] != "btc" else None
-        btc_price = get_price(btc_coin)
+        btc_price = get_cached_price(btc_coin)
+        show_coin_price = get_cached_price(show_coin) if show_coin["id"] != "btc" else None
         draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
         time.sleep(1)
 
