@@ -61,9 +61,12 @@ def draw_dashboard(price, t):
     label_y = y_offset - label_h
     price_y = label_y + label_h + 5  # small gap
 
-    # Draw label (BTC) and price, both centered horizontally
-    draw.text(((WIDTH - label_w)//2, label_y), label, font=label_font, fill=BTC_ORANGE)
-    draw.text(((WIDTH - price_w)//2, price_y), price_text, font=price_font, fill=(255,255,255))
+
+    right_offset = 60  # adjust this value as you wish
+
+    # New: move texts to the right
+    draw.text(((WIDTH - label_w)//2 + right_offset, label_y), label, font=label_font, fill=BTC_ORANGE)
+    draw.text(((WIDTH - price_w)//2 + right_offset, price_y), price_text, font=price_font, fill=(255,255,255))
 
     # ---- Rotate for display ----
     image = image.rotate(180)
