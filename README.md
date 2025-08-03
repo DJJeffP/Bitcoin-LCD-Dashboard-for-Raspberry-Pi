@@ -1,105 +1,142 @@
-# Bitcoin LCD Dashboard for Raspberry Pi
+# Bitcoin & Crypto LCD Dashboard for Raspberry Pi
 
-A modern, minimal Bitcoin price dashboard for Raspberry Pi with a 3.5" LCD touchscreen, designed for miner displays and always-on nerdy info panels.\
-It features a bold BTC price, real-time clock, and date, all overlayed on a beautiful custom Bitcoin-themed background.
+A modern, touch-friendly cryptocurrency dashboard for small LCD screens (like the 3.5" XPT2046 Pi display). Rotates live prices and info for your favorite coins, with custom backgrounds per coin. Supports CoinGecko (default) and automatic Binance fallback for price data.
 
 ---
 
 ## Features
 
-- Live BTC price (CoinGecko, auto-fallback to Binance)
-- Clock and date in the top right
-- Clean, modern black/white/orange theme (matches the Bitcoin palette)
-- Supports 480x320 Pi LCD (XPT2046, ILI9486, etc.)
-- Auto-clears screen on exit for a professional finish
+* Touchscreen-ready for Raspberry Pi with 3.5" (480x320) LCD (framebuffer `/dev/fb1`)
+* Modern, customizable look
+* Shows **BTC** always on screen as main, rotates other coins (configurable)
+* Custom PNG backgrounds for each coin (auto fallback if not found)
+* Periodic background price caching (default: every 60 sec, all coins in 1 API call)
+* CoinGecko as main source, **Binance fallback** for extra reliability
+* Easy config: `coins.json` (enable/disable coins, pick display color, add Binance symbol)
+* Auto-clears screen on exit
 
 ---
 
 ## Requirements
 
-- Raspberry Pi with Raspberry Pi OS (Lite or Desktop)
-- 3.5" LCD display with `/dev/fb1` framebuffer (XPT2046 or compatible)
-- Python 3 (pre-installed on most Pi images)
+* Python 3 (tested 3.7+)
+* Raspberry Pi OS (Lite of Desktop)
+* Pillow, requests
+* 3.5" XPT2046 Touch LCD or compatible (framebuffer `/dev/fb1`)
 
 ---
 
 ## Installation
 
-### 1. **Clone this repository**
+**1. Clone repo & enter folder:**
 
 ```sh
-git clone https://github.com/DJJeffP/Bitcoin-LCD-Dashboard-for-Raspberry-Pi.git
+git clone <repo-url>
 cd Bitcoin-LCD-Dashboard-for-Raspberry-Pi
 ```
 
-### 2. **Make the startup script executable**
+**2. Install requirements:**
 
 ```sh
-chmod +x install.sh start.sh
-./install.sh       # Doe je 1x voor setup
+sudo apt update && sudo apt install -y python3-pip python3-pil fonts-dejavu-core
+pip3 install --user requests pillow
 ```
+
+**3. Check or update your framebuffer device:**
+
+* Default is `/dev/fb1`. For HDMI or other screens: set `FRAMEBUFFER` in the script.
+
+**4. (Optional) Put your PNG backgrounds in `backgrounds/`**
+
+* Name like: `btc-bg.png`, `xmr-bg.png`, etc. (see coins.json)
+* No PNG? Fallback to `btc-bg.png`.
+
+**5. Configure coins:**
+
+* Edit `coins.json` to choose which coins to show and their colors.
+* Add `binance_symbol` for Binance fallback (see template)
 
 ---
 
 ## Usage
 
-### **Run the dashboard**
+Start the dashboard:
 
 ```sh
-./start.sh         # Om altijd te starten
+python3 btc_lcd_dashboard.py
 ```
 
-- The script will:
-  - Install any missing dependencies (`python3`, Pillow, requests, DejaVu fonts, etc.)
-  - Download the default background if missing
-  - Start the dashboard app on your LCD
+Or make a `start.sh`:
 
-**Stop the dashboard** at any time with CTRL+C.\
-The screen will automatically blank for a clean shutdown.
+```sh
+echo 'python3 btc_lcd_dashboard.py' > start.sh
+chmod +x start.sh
+./start.sh
+```
+
+Stop with **CTRL+C** (clears the screen automatically).
 
 ---
 
-## Customization
+## Example coins.json
 
-- **Background:**\
-  Replace `btc_bg_cropped.png` with your own 480x320 PNG for a custom look.
+```json
+{
+  "coins": [
+    {
+      "id": "btc",
+      "name": "Bitcoin",
+      "symbol": "BTC",
+      "color": "#F7931A",
+      "coingecko_id": "bitcoin",
+      "binance_symbol": "BTCUSDT",
+      "show": true
+    },
+    {
+      "id": "xmr",
+      "name": "Monero",
+      "symbol": "XMR",
+      "color": "#FF6600",
+      "coingecko_id": "monero",
+      "binance_symbol": "XMRUSDT",
+      "show": true
+    }
+    // ... (see full template in code)
+  ]
+}
+```
 
-- **Startup at boot:**\
-  To auto-start on boot, add this to your `/etc/rc.local` (before `exit 0`):
+---
 
-  ```sh
-  cd /path/to/btc-lcd-dashboard && ./start.sh &
-  ```
+## Notes
 
-- **Screen orientation:**\
-  Script includes a 180° rotation by default for typical Pi LCD orientation. Remove or change `.rotate(180)` if not desired.
+* All coins with `"show": true` are shown in the rotation.
+* Add/remove coins by editing `coins.json` (restart script after changes)
+* For Binance fallback: only works for coins/trading pairs available on Binance. Use exact Binance API symbol (e.g. `XMRUSDT`)
+* For fastest display, keep background PNGs simple (480x320 px)
 
 ---
 
 ## Troubleshooting
 
-- If you see color glitches (e.g., yellow appears purple), your hardware expects **RGB565 little-endian**. This script is already fixed for that!
-- If nothing shows, check:
-  - The Pi LCD is correctly set up and mapped to `/dev/fb1`
-  - Your user has permissions, or run with `sudo`
-- For further debugging, run the Python script directly:
-  ```sh
-  sudo python3 btc_lcd_dashboard.py
-  ```
+* **Screen blank/white?**
 
----
+  * Check your framebuffer (default `/dev/fb1`) and that LCD drivers are loaded.
+* **Font errors?**
 
-## License
+  * Make sure fonts-dejavu-core is installed (`sudo apt install fonts-dejavu-core`)
+* **API errors or 'N/A'?**
 
-MIT License
+  * Coin ID may not exist on CoinGecko or Binance, or network issue.
 
 ---
 
 ## Credits
 
-- Bitcoin logo and background by [NerdQAxePlus](https://github.com/shufps/ESP-Miner-NerdQAxePlus)
-- Powered by Python, Pillow, and open crypto APIs
+* Code, config and concept: DJJeffP & ChatGPT
 
 ---
 
-### Enjoy your nerdy Bitcoin dashboard! 🚀
+## License
+
+MIT (see LICENSE)
