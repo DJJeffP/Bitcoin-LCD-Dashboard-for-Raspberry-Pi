@@ -35,7 +35,8 @@ cd Bitcoin-LCD-Dashboard-for-Raspberry-Pi
 ### 2. **Make the startup script executable**
 
 ```sh
-chmod +x start.sh
+chmod +x install.sh start.sh
+./install.sh       # Doe je 1x voor setup
 ```
 
 ---
@@ -45,7 +46,7 @@ chmod +x start.sh
 ### **Run the dashboard**
 
 ```sh
-./start.sh
+./start.sh         # Om altijd te starten
 ```
 
 - The script will:
@@ -67,7 +68,7 @@ The screen will automatically blank for a clean shutdown.
   To auto-start on boot, add this to your `/etc/rc.local` (before `exit 0`):
 
   ```sh
-  cd /path/to/Bitcoin-LCD-Dashboard-for-Raspberry-Pi && ./start.sh &
+  cd /path/to/btc-lcd-dashboard && ./start.sh &
   ```
 
 - **Screen orientation:**\
@@ -102,6 +103,3 @@ MIT License
 ---
 
 ### Enjoy your nerdy Bitcoin dashboard! 🚀
-
-
-

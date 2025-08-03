@@ -1,0 +1,124 @@
+{
+  "coins": [
+    {
+      "id": "btc",
+      "name": "Bitcoin",
+      "symbol": "BTC",
+      "color": "#F7931A",
+      "coingecko_id": "bitcoin",
+      "show": true
+    },
+    {
+      "id": "xmr",
+      "name": "Monero",
+      "symbol": "XMR",
+      "color": "#FF6600",
+      "coingecko_id": "monero",
+      "show": true
+    },
+    {
+      "id": "cfx",
+      "name": "Conflux",
+      "symbol": "CFX",
+      "color": "#22C3C3",
+      "coingecko_id": "conflux-token",
+      "show": true
+    },
+    {
+      "id": "xtm",
+      "name": "Tari",
+      "symbol": "XTM",
+      "color": "#E91E63",
+      "coingecko_id": "tari",
+      "show": true
+    },
+    {
+      "id": "sol",
+      "name": "Solana",
+      "symbol": "SOL",
+      "color": "#00FFA3",
+      "coingecko_id": "solana",
+      "show": true
+    },
+    {
+      "id": "rvn",
+      "name": "Ravencoin",
+      "symbol": "RVN",
+      "color": "#384182",
+      "coingecko_id": "ravencoin",
+      "show": true
+    },
+    {
+      "id": "qubic",
+      "name": "Qubic",
+      "symbol": "QUBIC",
+      "color": "#1ABC9C",
+      "coingecko_id": "qubic",
+      "show": true
+    },
+    {
+      "id": "bch",
+      "name": "Bitcoin Cash",
+      "symbol": "BCH",
+      "color": "#8DC351",
+      "coingecko_id": "bitcoin-cash",
+      "show": true
+    },
+    {
+      "id": "xno",
+      "name": "Nano",
+      "symbol": "XNO",
+      "color": "#4A90E2",
+      "coingecko_id": "nano",
+      "show": true
+    },
+    {
+      "id": "eth",
+      "name": "Ethereum",
+      "symbol": "ETH",
+      "color": "#3C3C3D",
+      "coingecko_id": "ethereum",
+      "show": true
+    },
+    {
+      "id": "qrl",
+      "name": "Quantum RL",
+      "symbol": "QRL",
+      "color": "#6300FF",
+      "coingecko_id": "the-quantum-resistant-ledger",
+      "show": true
+    },
+    {
+      "id": "erg",
+      "name": "Ergo",
+      "symbol": "ERG",
+      "color": "#000000",
+      "coingecko_id": "ergo",
+      "show": true
+    },
+    {
+      "id": "zeph",
+      "name": "Zephyr",
+      "symbol": "ZEPH",
+      "color": "#DFAF37",
+      "coingecko_id": "zephyr-protocol",
+      "show": true
+    },
+    {
+      "id": "sal",
+      "name": "Sal",
+      "symbol": "SAL",
+      "color": "#B844F6",
+      "coingecko_id": "salad",
+      "show": true
+    },
+    {
+      "id": "epic",
+      "name": "Epic Cash",
+      "symbol": "EPIC",
+      "color": "#2D3748",
+      "coingecko_id": "epic-cash",
+      "show": true
+    }
+  ]
+}
