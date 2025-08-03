@@ -97,9 +97,9 @@ MIT License
 
 ## Credits
 
-- Bitcoin logo and background by [NerdQAxePlus](https://github.com/shufps/ESP-Miner-NerdQAxePlus)
 - Powered by Python, Pillow, and open crypto APIs
 
 ---
 
 ### Enjoy your nerdy Bitcoin dashboard! 🚀
+
