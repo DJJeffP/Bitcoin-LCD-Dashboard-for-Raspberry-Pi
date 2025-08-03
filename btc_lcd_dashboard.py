@@ -119,7 +119,7 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
 
     # ---- BTC altijd zichtbaar als hoofdcoin (iets hoger in beeld) ----
     label = "BTC"
-    price_text = "$" + (f"{btc_price:,.2f}" if btc_price is not None else "N/A")
+    price_text = "$" + (str(btc_price) if btc_price is not None else "N/A")
     label_w, label_h = draw.textbbox((0, 0), label, font=font_main)[2:]
     price_w, price_h = draw.textbbox((0, 0), price_text, font=font_value)[2:]
     right_offset = 60
@@ -132,7 +132,7 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
     if coin["id"] != "btc":
         c_label = coin["symbol"]
         c_color = hex_to_rgb(coin["color"])
-        c_price = "$" + (f"{coin_price:,.2f}" if coin_price is not None else "N/A")
+        c_price = "$" + (str(coin_price) if coin_price is not None else "N/A")
         c_label_w, c_label_h = draw.textbbox((0, 0), c_label, font=font_main)[2:]
         c_price_w, c_price_h = draw.textbbox((0, 0), c_price, font=font_value)[2:]
         y_offset = int(HEIGHT * 0.75)
@@ -140,6 +140,7 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
         c_price_y = c_label_y + c_label_h + 5
         draw.text(((WIDTH - c_label_w)//2 + right_offset, c_label_y), c_label, font=font_main, fill=c_color)
         draw.text(((WIDTH - c_price_w)//2 + right_offset, c_price_y), c_price, font=font_value, fill=(255,255,255))
+
 
     # ---- Rotatie voor LCD ----
     image = image.rotate(180)
