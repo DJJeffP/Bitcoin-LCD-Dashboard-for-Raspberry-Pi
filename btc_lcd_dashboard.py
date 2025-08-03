@@ -39,6 +39,7 @@ def price_updater(coins):
         ids = [coin.get("coingecko_id", coin.get("id")) for coin in coins]
         ids_param = ",".join(ids)
         try:
+            # 1. Bulk request via CoinGecko
             url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids_param}&vs_currencies=usd"
             r = requests.get(url, timeout=8)
             prices = r.json()
@@ -50,7 +51,36 @@ def price_updater(coins):
                         price_cache[coingecko_id] = float(price)
                     print(f"[INFO] Updated {coin['symbol']} price: {price}")
                 else:
-                    print(f"[WARNING] {coin['symbol']} (id: {coingecko_id}) not found in API response: {prices}")
+                    # 2. Fallback: probeer single request CoinGecko
+                    try:
+                        url_single = f"https://api.coingecko.com/api/v3/simple/price?ids={coingecko_id}&vs_currencies=usd"
+                        r_single = requests.get(url_single, timeout=8)
+                        single_price = r_single.json().get(coingecko_id, {}).get("usd")
+                        if single_price is not None:
+                            with price_cache_lock:
+                                price_cache[coingecko_id] = float(single_price)
+                            print(f"[FALLBACK] Updated {coin['symbol']} price (single): {single_price}")
+                        else:
+                            # 3. Laatste fallback: probeer Binance (indien symbool bekend)
+                            symbol = coin.get("symbol", "").upper()
+                            if symbol and symbol != "BTC":
+                                binance_pair = f"{symbol}USDT"
+                                binance_url = f"https://api.binance.com/api/v3/ticker/price?symbol={binance_pair}"
+                                r_bin = requests.get(binance_url, timeout=8)
+                                if r_bin.ok:
+                                    price_bin = float(r_bin.json().get("price", 0))
+                                    if price_bin > 0:
+                                        with price_cache_lock:
+                                            price_cache[coingecko_id] = price_bin
+                                        print(f"[BINANCE] Updated {coin['symbol']} price: {price_bin}")
+                                    else:
+                                        print(f"[WARNING] {coin['symbol']} not found at Binance ({binance_pair}): {r_bin.text}")
+                                else:
+                                    print(f"[WARNING] {coin['symbol']} Binance API error: {r_bin.text}")
+                            else:
+                                print(f"[WARNING] {coin['symbol']} not found in any API (ID: {coingecko_id})")
+                    except Exception as e2:
+                        print(f"[ERROR] Fallback failed for {coingecko_id}: {e2}")
         except Exception as e:
             print(f"[ERROR] API call failed: {e}")
         time.sleep(PRICE_UPDATE_SECS)
