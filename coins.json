@@ -29,7 +29,7 @@
       "name": "Tari",
       "symbol": "XTM",
       "color": "#E91E63",
-      "coingecko_id": "tari",
+      "coingecko_id": "minotari-tari",
       "show": true
     },
     {
@@ -54,7 +54,7 @@
       "symbol": "QUBIC",
       "color": "#1ABC9C",
       "coingecko_id": "qubic",
-      "show": true
+      "show": false
     },
     {
       "id": "bch",
