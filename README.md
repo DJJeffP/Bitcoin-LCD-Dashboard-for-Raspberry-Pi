@@ -31,7 +31,7 @@ A modern, touch-friendly cryptocurrency dashboard for small LCD screens (like th
 **1. Clone repo & enter folder:**
 
 ```sh
-git clone <repo-url>
+git clone https://github.com/DJJeffP/Bitcoin-LCD-Dashboard-for-Raspberry-Pi.git
 cd Bitcoin-LCD-Dashboard-for-Raspberry-Pi
 ```
 
