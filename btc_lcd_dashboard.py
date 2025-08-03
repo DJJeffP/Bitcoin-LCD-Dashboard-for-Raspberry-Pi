@@ -33,28 +33,37 @@ def get_btc_price():
             return None
 
 def draw_dashboard(price, t):
-    # Use your custom PNG background
+    # Load background
     image = Image.open("btc_bg_cropped.png").convert("RGB").resize((WIDTH, HEIGHT))
     draw = ImageDraw.Draw(image)
 
-    # ---- Draw Time (top right) ----
+    # ---- Time and Date (top right, as before) ----
     now_str = time.strftime("%H:%M:%S", t)
     date_str = time.strftime("%a %d %b %Y", t)
-    # Get width of both time and date for right alignment
     time_w, time_h = draw.textbbox((0, 0), now_str, font=font_time)[2:]
     date_w, date_h = draw.textbbox((0, 0), date_str, font=font_date)[2:]
-
-    # Right-aligned at 20px from the right, 16px from the top
     draw.text((WIDTH - time_w - 20, 16), now_str, font=font_time, fill=(255,255,255))
     draw.text((WIDTH - date_w - 20, 16 + time_h + 2), date_str, font=font_date, fill=BTC_ORANGE)
 
-    # ---- Draw BTC Price (centered) ----
-    price_text = "BTC $" + (f"{price:,.2f}" if price is not None else "N/A")
-    price_w, price_h = draw.textbbox((0, 0), price_text, font=font_btc)[2:]
-    # Centered
-    center_x = (WIDTH - price_w) // 2
-    center_y = (HEIGHT - price_h) // 2
-    draw.text((center_x, center_y), price_text, font=font_btc, fill=BTC_ORANGE)
+    # ---- BTC and Price, stacked and centered near lower 1/4 of screen ----
+    label_font = ImageFont.truetype(FONT_BIG, 36)
+    price_font = ImageFont.truetype(FONT_BIG, 48)
+
+    label = "BTC"
+    price_text = "$" + (f"{price:,.2f}" if price is not None else "N/A")
+
+    # Center horizontally
+    label_w, label_h = draw.textbbox((0, 0), label, font=label_font)[2:]
+    price_w, price_h = draw.textbbox((0, 0), price_text, font=price_font)[2:]
+
+    # Y position: around 75% down the screen, but adjust for stacked text
+    y_offset = int(HEIGHT * 0.75)
+    label_y = y_offset - label_h
+    price_y = label_y + label_h + 5  # small gap
+
+    # Draw label (BTC) and price, both centered horizontally
+    draw.text(((WIDTH - label_w)//2, label_y), label, font=label_font, fill=BTC_ORANGE)
+    draw.text(((WIDTH - price_w)//2, price_y), price_text, font=price_font, fill=(255,255,255))
 
     # ---- Rotate for display ----
     image = image.rotate(180)
@@ -70,6 +79,7 @@ def draw_dashboard(price, t):
         rgb565.append((value >> 8) & 0xFF)
     with open(FRAMEBUFFER, 'wb') as f:
         f.write(rgb565)
+
 
 def main():
     clear_framebuffer()
