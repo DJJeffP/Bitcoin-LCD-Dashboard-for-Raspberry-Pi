@@ -29,7 +29,7 @@ It features a bold BTC price, real-time clock, and date, all overlayed on a beau
 
 ```sh
 git clone https://github.com/DJJeffP/Bitcoin-LCD-Dashboard-for-Raspberry-Pi.git
-cd btc-lcd-dashboard
+cd Bitcoin-LCD-Dashboard-for-Raspberry-Pi
 ```
 
 ### 2. **Make the startup script executable**
@@ -67,7 +67,7 @@ The screen will automatically blank for a clean shutdown.
   To auto-start on boot, add this to your `/etc/rc.local` (before `exit 0`):
 
   ```sh
-  cd /path/to/btc-lcd-dashboard && ./start.sh &
+  cd /path/to/Bitcoin-LCD-Dashboard-for-Raspberry-Pi && ./start.sh &
   ```
 
 - **Screen orientation:**\
@@ -102,5 +102,6 @@ MIT License
 ---
 
 ### Enjoy your nerdy Bitcoin dashboard! 🚀
+
 
 
