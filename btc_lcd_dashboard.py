@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 FRAMEBUFFER = "/dev/fb1"
 WIDTH, HEIGHT = 480, 320
+debug=True
 
 # Configuratie
 CONFIG_FILE = "coins.json"
@@ -28,15 +29,35 @@ def load_coins(config_file=CONFIG_FILE):
     coins = [coin for coin in cfg.get("coins", []) if coin.get("show", True)]
     return coins
 
-def get_price(coin):
+import requests
+
+# Globale cache voor laatste bekende prijzen
+last_known_prices = {}
+
+def get_price(coin, debug=False):
     coingecko_id = coin.get("coingecko_id", coin.get("id"))
     try:
         url = f"https://api.coingecko.com/api/v3/simple/price?ids={coingecko_id}&vs_currencies=usd"
-        r = requests.get(url, timeout=6)
+        r = requests.get(url, timeout=8)
+        # Debug: print altijd de API response voor deze coin
+        if debug:
+            print(f"[DEBUG] {coin['symbol']} API response: {r.text}")
         price = r.json()[coingecko_id]["usd"]
+        # Sla op als laatste bekende prijs
+        last_known_prices[coingecko_id] = float(price)
         return float(price)
-    except Exception:
-        return None
+    except Exception as e:
+        # Debug: print error, en geef de laatst bekende prijs terug
+        if debug:
+            print(f"[DEBUG] Error getting price for {coingecko_id}: {e}")
+        # Fallback: laatst bekende prijs
+        if coingecko_id in last_known_prices:
+            return last_known_prices[coingecko_id]
+        return None  # bij allereerste keer geen prijs
+
+# Voorbeeld van gebruik:
+# price = get_price(coin, debug=True)
+
 
 def hex_to_rgb(hex_color, fallback=(247,147,26)):
     # "#FF6600" -> (255,102,0)
