@@ -46,7 +46,12 @@ def price_updater(coins):
                     price_cache[coingecko_id] = float(price)
                 print(f"[INFO] Updated {coin['symbol']} price: {price}")
             except Exception as e:
-                print(f"[WARNING] {coin['symbol']} API error: {e}")
+                try:
+                    # Probeer de response tekst te printen, indien beschikbaar
+                    api_response = r.text if 'r' in locals() else "(geen response)"
+                except:
+                    api_response = "(geen response)"
+                print(f"[WARNING] {coin['symbol']} API error: {e} (response: {api_response})")
         time.sleep(PRICE_UPDATE_SECS)
 
 def get_cached_price(coin):
