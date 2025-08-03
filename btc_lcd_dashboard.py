@@ -36,22 +36,23 @@ price_cache_lock = threading.Lock()
 
 def price_updater(coins):
     while True:
-        for coin in coins:
-            coingecko_id = coin.get("coingecko_id", coin.get("id"))
-            try:
-                url = f"https://api.coingecko.com/api/v3/simple/price?ids={coingecko_id}&vs_currencies=usd"
-                r = requests.get(url, timeout=8)
-                price = r.json()[coingecko_id]["usd"]
-                with price_cache_lock:
-                    price_cache[coingecko_id] = float(price)
-                print(f"[INFO] Updated {coin['symbol']} price: {price}")
-            except Exception as e:
-                try:
-                    # Probeer de response tekst te printen, indien beschikbaar
-                    api_response = r.text if 'r' in locals() else "(geen response)"
-                except:
-                    api_response = "(geen response)"
-                print(f"[WARNING] {coin['symbol']} API error: {e} (response: {api_response})")
+        ids = [coin.get("coingecko_id", coin.get("id")) for coin in coins]
+        ids_param = ",".join(ids)
+        try:
+            url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids_param}&vs_currencies=usd"
+            r = requests.get(url, timeout=8)
+            prices = r.json()
+            for coin in coins:
+                coingecko_id = coin.get("coingecko_id", coin.get("id"))
+                price = prices.get(coingecko_id, {}).get("usd")
+                if price is not None:
+                    with price_cache_lock:
+                        price_cache[coingecko_id] = float(price)
+                    print(f"[INFO] Updated {coin['symbol']} price: {price}")
+                else:
+                    print(f"[WARNING] {coin['symbol']} (id: {coingecko_id}) not found in API response: {prices}")
+        except Exception as e:
+            print(f"[ERROR] API call failed: {e}")
         time.sleep(PRICE_UPDATE_SECS)
 
 def get_cached_price(coin):
