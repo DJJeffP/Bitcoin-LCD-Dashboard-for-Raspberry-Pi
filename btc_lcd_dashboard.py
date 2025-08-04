@@ -405,6 +405,9 @@ if __name__ == "__main__":
         time.sleep(0.5)
         print("LCD is now blank. Goodbye!")
     except Exception as e:
+        import traceback
         print("Error:", e)
+        traceback.print_exc()
         clear_framebuffer()
         time.sleep(1)
+
