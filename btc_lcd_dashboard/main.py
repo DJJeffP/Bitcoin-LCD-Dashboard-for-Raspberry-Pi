@@ -85,7 +85,7 @@ def main():
                 last_clock_str = ""
                 _prev_btc_box = None
                 _prev_coin_box = None
-                redraw_full = False  # zet redraw terug naar False
+                redraw_full = False  # <-- BELANGRIJK: direct na redraw terug op False!
                 # Geen overlays tekenen deze iteratie
             else:
                 # --- Overlay BTC box ---
@@ -100,6 +100,7 @@ def main():
                 # --- Overlay coin box onder BTC ---
                 coin_top = show_coin["symbol"].upper()
                 coin_value = "$" + (str(show_coin_price) if show_coin_price is not None else "N/A")
+                coin_color = hex_to_rgb(show_coin["color"])
                 coin_y = _prev_btc_box[1] + _prev_btc_box[3] + 20 if _prev_btc_box else (_btc_price_y + _btc_price_h + 20)
                 _prev_coin_box = draw_text_overlay_box(
                     coin_top, coin_value, coin_color, textbox_offset, coin_y, prev_box=_prev_coin_box
@@ -113,6 +114,7 @@ def main():
         else:
             setup_touch_listener(coins, switch_to_dashboard)
             time.sleep(0.1)
+
 
 if __name__ == "__main__":
     try:
