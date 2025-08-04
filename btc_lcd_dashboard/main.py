@@ -107,6 +107,7 @@ if __name__ == "__main__":
         import traceback
         print("Error:", e)
         traceback.print_exc()
-        wait_for_keypress()
+        wait_for_keypress()  # <-- Wacht hier op toets voordat verder
         clear_framebuffer()
         time.sleep(1)
+
