@@ -81,6 +81,7 @@ def calibrate_touch():
         ("Center", WIDTH//2, HEIGHT//2),
     ]
     raw_points = []
+    screen_points = []
     device = evdev.InputDevice(TOUCH_DEVICE)
 
     for name, x, y in points:
@@ -98,24 +99,22 @@ def calibrate_touch():
                 elif event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_TOUCH and event.value == 0:
                     if raw_x is not None and raw_y is not None:
                         raw_points.append((raw_x, raw_y))
+                        screen_points.append((x, y))
                         print(f"[CALIBRATION] Got raw ({raw_x}, {raw_y}) for {name}")
                         got_tap = True
                         break
             if got_tap:
                 break
 
-    xs, ys = zip(*raw_points)
     calibration_data = {
-        "raw_min_x": int(min(xs)),
-        "raw_max_x": int(max(xs)),
-        "raw_min_y": int(min(ys)),
-        "raw_max_y": int(max(ys)),
-        "points": raw_points,
+        "screen_points": screen_points,
+        "raw_points": raw_points,
     }
     with open(CALIBRATION_FILE, "w") as f:
         json.dump(calibration_data, f, indent=2)
     print("[CALIBRATION] Calibration complete and saved.")
     time.sleep(1)
+
 
 def load_calibration():
     if not os.path.isfile(CALIBRATION_FILE):
@@ -129,21 +128,29 @@ def scale_touch(x, y):
     global calib
     if calib is None:
         calib = load_calibration()
-    raw_min_x = calib["raw_min_x"]
-    raw_max_x = calib["raw_max_x"]
-    raw_min_y = calib["raw_min_y"]
-    raw_max_y = calib["raw_max_y"]
-    # SWAP axes for 90-degree rotation!
-    pixel_x = int((y - raw_min_y) * WIDTH / (raw_max_y - raw_min_y))
-    pixel_y = int((x - raw_min_x) * HEIGHT / (raw_max_x - raw_min_x))
+    # Unpack
+    screen_points = calib["screen_points"]
+    raw_points = calib["raw_points"]
 
-    # Flip the Y axis (mirror vertically)
-    pixel_y = HEIGHT - pixel_y - 1
+    # We'll use top-left (idx 0) and bottom-right (idx 2)
+    (sx0, sy0), (sx1, sy1) = screen_points[0], screen_points[2]
+    (rx0, ry0), (rx1, ry1) = raw_points[0], raw_points[2]
+
+    # x axis: map raw y to screen x (due to 90deg rotation)
+    # y axis: map raw x to screen y (due to 90deg rotation)
+    # And flip if needed (if calibration shows min > max)
+    if rx1 == rx0: rx1 += 1
+    if ry1 == ry0: ry1 += 1
+    if sx1 == sx0: sx1 += 1
+    if sy1 == sy0: sy1 += 1
+
+    pixel_x = int((y - ry0) * (sx1 - sx0) / (ry1 - ry0) + sx0)
+    pixel_y = int((x - rx0) * (sy1 - sy0) / (rx1 - rx0) + sy0)
 
     pixel_x = max(0, min(WIDTH-1, pixel_x))
     pixel_y = max(0, min(HEIGHT-1, pixel_y))
-
     return pixel_x, pixel_y
+
 
 def is_in_clock_area(x, y):
     return x >= 428
