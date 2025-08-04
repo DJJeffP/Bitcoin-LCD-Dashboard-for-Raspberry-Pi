@@ -3,19 +3,32 @@ import json
 import os
 import threading
 import requests
+import evdev
 from PIL import Image, ImageDraw, ImageFont
 
+# ==== LCD / Touch Config ====
 FRAMEBUFFER = "/dev/fb1"
 WIDTH, HEIGHT = 480, 320
+TOUCH_DEVICE = '/dev/input/event0'
 
-# Configuratie
+def scale_touch(x, y):
+    # Map raw touch to screen pixel coordinates (your calibration)
+    pixel_x = int(x * 480 / 3592)
+    pixel_y = int(y * 320 / 3732)
+    return pixel_x, pixel_y
+
+def is_in_clock_area(x, y):
+    # Top-right: x >= 428 (your "clock area")
+    return x >= 428
+
+# ==== Config ====
 CONFIG_FILE = "coins.json"
 BG_FOLDER = "backgrounds"
 BG_FALLBACK = os.path.join(BG_FOLDER, "btc-bg.png")
 ROTATE_SECS = 20
 PRICE_UPDATE_SECS = 60  # Cache verversen
 
-# Fonts
+# ==== Fonts ====
 FONT_BIG = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 FONT_SMALL = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 font_main = ImageFont.truetype(FONT_BIG, 36)
@@ -30,7 +43,7 @@ def load_coins(config_file=CONFIG_FILE):
     coins = [coin for coin in cfg.get("coins", []) if coin.get("show", True)]
     return coins
 
-# --- Globale prijs-cache ---
+# === Price Caching ===
 price_cache = {}
 price_cache_lock = threading.Lock()
 
@@ -60,7 +73,6 @@ def price_updater(coins):
                                 price_cache[coingecko_id] = float(single_price)
                             print(f"[FALLBACK] Updated {coin['symbol']} price (single): {single_price}")
                         else:
-                            # Binance fallback alleen als binance_symbol ingevuld is
                             binance_symbol = coin.get("binance_symbol")
                             if binance_symbol:
                                 binance_url = f"https://api.binance.com/api/v3/ticker/price?symbol={binance_symbol}"
@@ -83,7 +95,6 @@ def price_updater(coins):
             print(f"[ERROR] API call failed: {e}")
         time.sleep(PRICE_UPDATE_SECS)
 
-
 def get_cached_price(coin):
     coingecko_id = coin.get("coingecko_id", coin.get("id"))
     with price_cache_lock:
@@ -100,6 +111,10 @@ def clear_framebuffer():
     with open(FRAMEBUFFER, 'wb') as f:
         f.write(bytearray([0x00, 0x00] * WIDTH * HEIGHT))
 
+# ==== UI MODE ====
+ui_mode = {'dashboard': True}  # Shared between threads
+
+# ==== Dashboard Drawing ====
 def draw_dashboard(btc_price, btc_color, coin, coin_price):
     coin_id = coin["id"]
     coin_bg = os.path.join(BG_FOLDER, f"{coin_id}-bg.png")
@@ -141,7 +156,6 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
         draw.text(((WIDTH - c_label_w)//2 + right_offset, c_label_y), c_label, font=font_main, fill=c_color)
         draw.text(((WIDTH - c_price_w)//2 + right_offset, c_price_y), c_price, font=font_value, fill=(255,255,255))
 
-
     # ---- Rotatie voor LCD ----
     image = image.rotate(180)
 
@@ -157,6 +171,89 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
     with open(FRAMEBUFFER, 'wb') as f:
         f.write(rgb565)
 
+# ==== SETUP/SEARCH SCREEN (SIMPLE) ====
+def draw_setup_screen():
+    image = Image.new("RGB", (WIDTH, HEIGHT), (30,30,60))
+    draw = ImageDraw.Draw(image)
+    # Title bar
+    draw.rectangle([0, 0, WIDTH, 55], fill=(50,50,90))
+    font = ImageFont.truetype(FONT_BIG, 28)
+    draw.text((20, 10), "SETUP / COIN SEARCH", fill=(255,255,255), font=font)
+    # Save button
+    draw.rectangle([WIDTH-160, HEIGHT-70, WIDTH-20, HEIGHT-20], fill=(60,130,60))
+    draw.text((WIDTH-150, HEIGHT-58), "SAVE", fill=(255,255,255), font=font)
+    # You can add: search bar, keyboard, toggles etc. here!
+    # ---- Rotatie voor LCD ----
+    image = image.rotate(180)
+    # Write to framebuffer
+    rgb565 = bytearray()
+    for pixel in image.getdata():
+        r = pixel[0] >> 3
+        g = pixel[1] >> 2
+        b = pixel[2] >> 3
+        value = (r << 11) | (g << 5) | b
+        rgb565.append(value & 0xFF)
+        rgb565.append((value >> 8) & 0xFF)
+    with open(FRAMEBUFFER, 'wb') as f:
+        f.write(rgb565)
+
+def handle_setup_touch(x, y):
+    # Remember, screen is rotated, but touch is not!
+    # SAVE button: right-bottom corner: WIDTH-160, HEIGHT-70, WIDTH-20, HEIGHT-20
+    if WIDTH-160 <= x <= WIDTH-20 and HEIGHT-70 <= y <= HEIGHT-20:
+        print("[SETUP] SAVE button touched! Returning to dashboard.")
+        switch_to_dashboard()
+
+def setup_touch_listener():
+    device = evdev.InputDevice(TOUCH_DEVICE)
+    raw_x, raw_y = 0, 0
+    for event in device.read_loop():
+        if ui_mode['dashboard']:
+            break  # Exit listener if user left setup mode
+        if event.type == evdev.ecodes.EV_ABS:
+            if event.code == evdev.ecodes.ABS_X:
+                raw_x = event.value
+            elif event.code == evdev.ecodes.ABS_Y:
+                raw_y = event.value
+        elif event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_TOUCH and event.value == 1:
+            x, y = scale_touch(raw_x, raw_y)
+            print(f"[DEBUG][SETUP] Touch at x={x}, y={y}")
+            handle_setup_touch(x, y)
+
+# ==== DASHBOARD <--> SETUP MODE SWITCH ====
+def switch_to_setup():
+    print(">>> Switching to SETUP mode!")
+    ui_mode['dashboard'] = False
+
+def switch_to_dashboard():
+    print(">>> Returning to DASHBOARD mode!")
+    ui_mode['dashboard'] = True
+
+# ==== DOUBLE-TAP DETECTOR THREAD ====
+def double_tap_detector(trigger_callback):
+    device = evdev.InputDevice(TOUCH_DEVICE)
+    last_tap_time = 0
+    DOUBLE_TAP_MAX_INTERVAL = 0.4  # seconds
+    raw_x, raw_y = 0, 0
+    for event in device.read_loop():
+        if event.type == evdev.ecodes.EV_ABS:
+            if event.code == evdev.ecodes.ABS_X:
+                raw_x = event.value
+            elif event.code == evdev.ecodes.ABS_Y:
+                raw_y = event.value
+        elif event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_TOUCH and event.value == 1:
+            x, y = scale_touch(raw_x, raw_y)
+            print(f"[DEBUG] Touch at x={x}, y={y}")
+            now = time.time()
+            if is_in_clock_area(x, y):
+                if last_tap_time and (now - last_tap_time < DOUBLE_TAP_MAX_INTERVAL):
+                    print("[TOUCH] Double tap detected in clock area!")
+                    trigger_callback()
+                    last_tap_time = 0
+                else:
+                    last_tap_time = now
+
+# ==== MAIN PROGRAM ====
 def main():
     clear_framebuffer()
     coins = load_coins()
@@ -164,23 +261,32 @@ def main():
     btc_color = hex_to_rgb(btc_coin["color"])
 
     # Start background price updater
-    t = threading.Thread(target=price_updater, args=(coins,), daemon=True)
-    t.start()
+    t_price = threading.Thread(target=price_updater, args=(coins,), daemon=True)
+    t_price.start()
+
+    # Start double-tap detector for switching to setup
+    t_touch = threading.Thread(target=double_tap_detector, args=(switch_to_setup,), daemon=True)
+    t_touch.start()
 
     last_rot_time = 0
     coin_index = 0
 
     while True:
-        now = time.time()
-        # Elke 20 sec: andere coin
-        if now - last_rot_time >= ROTATE_SECS:
-            coin_index = (coin_index + 1) % len(coins)
-            last_rot_time = now
-        show_coin = coins[coin_index]
-        btc_price = get_cached_price(btc_coin)
-        show_coin_price = get_cached_price(show_coin) if show_coin["id"] != "btc" else None
-        draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
-        time.sleep(1)
+        if ui_mode['dashboard']:
+            now = time.time()
+            if now - last_rot_time >= ROTATE_SECS:
+                coin_index = (coin_index + 1) % len(coins)
+                last_rot_time = now
+            show_coin = coins[coin_index]
+            btc_price = get_cached_price(btc_coin)
+            show_coin_price = get_cached_price(show_coin) if show_coin["id"] != "btc" else None
+            draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
+            time.sleep(0.95)
+        else:
+            # Setup/Search mode
+            draw_setup_screen()
+            setup_touch_listener()
+            time.sleep(0.1)  # Small sleep to avoid tight loop
 
 if __name__ == "__main__":
     try:
