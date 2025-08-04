@@ -89,6 +89,9 @@ def main():
             if coin_val_str != last_coin_val_str:
                 update_coin_value_area(coin_val_str)
                 last_coin_val_str = coin_val_str
+            if now_str != last_clock_str:
+                update_clock_area(btc_color)  # GEEF BTC-KLEUR MEE!
+                last_clock_str = now_str
 
             time.sleep(0.1)
         else:
