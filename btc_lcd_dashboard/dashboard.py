@@ -1,6 +1,7 @@
 # dashboard.py
 """
-Dashboard-drawing met efficiënte klok-update via correcte orientatie en rotatie.
+Dashboard met snelle overlays: alleen klok en coin value box worden geüpdatet als overlay!
+Achtergrond blijft altijd in originele orientatie, rotatie alleen direct voor framebuffer.
 """
 
 import os
@@ -12,17 +13,17 @@ FRAMEBUFFER = "/dev/fb1"
 BG_FOLDER = "backgrounds"
 BG_FALLBACK = os.path.join(BG_FOLDER, "btc-bg.png")
 
-# Klok regio (in originele orientatie)
-CLOCK_X = 315   # Rechtsboven
+# Klok rechtsboven, evt. X naar links als je wilt
+CLOCK_X = 270
 CLOCK_Y = 10
-CLOCK_W = 155
+CLOCK_W = 200
 CLOCK_H = 55
 
-# Coin value regio (boven BTC prijs)
-COIN_X = 60
-COIN_Y = 20
-COIN_W = 240
-COIN_H = 55
+# Coin value box rechtsonder
+COIN_BOX_X = 240
+COIN_BOX_Y = 230
+COIN_BOX_W = 210
+COIN_BOX_H = 70
 
 # Fonts
 FONT_BIG = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -41,8 +42,7 @@ def hex_to_rgb(hex_color, fallback=(247,147,26)):
 
 def draw_dashboard(btc_price, btc_color, coin, coin_price):
     """
-    Teken volledige dashboard: achtergrond, BTC, andere coin info, klok wordt apart geüpdatet.
-    Werkt intern altijd in 0° orientatie. Rotatie gebeurt pas direct voor framebuffer.
+    Tekent alleen de statische achtergrond, BTC naam/waarde, géén overlay coin box en geen klok!
     """
     coin_id = coin["id"]
     coin_bg = os.path.join(BG_FOLDER, f"{coin_id}-bg.png")
@@ -63,24 +63,11 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
     draw.text(((WIDTH - label_w)//2 + right_offset, btc_label_y), label, font=font_main, fill=btc_color_rgb)
     draw.text(((WIDTH - price_w)//2 + right_offset, btc_price_y), price_text, font=font_value, fill=(255,255,255))
 
-    # Andere coin centraal onderin
-    if coin["id"] != "btc":
-        c_label = coin["symbol"]
-        c_color = hex_to_rgb(coin["color"])
-        c_price = "$" + (str(coin_price) if coin_price is not None else "N/A")
-        c_label_w, c_label_h = draw.textbbox((0, 0), c_label, font=font_main)[2:]
-        c_price_w, c_price_h = draw.textbbox((0, 0), c_price, font=font_value)[2:]
-        y_offset = int(HEIGHT * 0.75)
-        c_label_y = y_offset - c_label_h
-        c_price_y = c_label_y + c_label_h + 5
-        draw.text(((WIDTH - c_label_w)//2 + right_offset, c_label_y), c_label, font=font_main, fill=c_color)
-        draw.text(((WIDTH - c_price_w)//2 + right_offset, c_price_y), c_price, font=font_value, fill=(255,255,255))
-
-    # Bewaar full_bg voor klok-update (globaal, altijd in 0° orientatie)
+    # Bewaar bg voor overlays
     global _full_bg_cache
     _full_bg_cache = full_bg.copy()
 
-    # Volledige scherm rotatie (180 graden, zoals hardware verwacht)
+    # Volledig scherm roteren en schrijven
     img_rot = full_bg.rotate(180)
     rgb565 = bytearray()
     for pixel in img_rot.getdata():
@@ -95,30 +82,24 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
 
 def update_clock_area(btc_color=(247,147,26)):
     """
-    Snijdt klokgebied uit cached achtergrond (in 0° orientatie), tekent klok en datum erop,
-    roteert het blokje, en schrijft het naar de juiste plek in framebuffer.
+    Overlay de klok rechtsboven als losse block met oranje datum.
     """
     global _full_bg_cache
     if '_full_bg_cache' not in globals():
-        return  # Geen achtergrond beschikbaar
+        return
 
-    # 1. Snijd klokgebied uit (0° orientatie)
+    # Copy uit originele bg
     img = _full_bg_cache.crop((CLOCK_X, CLOCK_Y, CLOCK_X + CLOCK_W, CLOCK_Y + CLOCK_H))
     draw = ImageDraw.Draw(img)
     t = time.localtime()
     now_str = time.strftime("%H:%M:%S", t)
     date_str = time.strftime("%a %d %b %Y", t)
-
-    # Teken tijd en datum
     time_color = (255,255,255)
-    date_color = btc_color  # BTC-oranje!
+    date_color = btc_color
     draw.text((10, 0), now_str, font=font_time, fill=time_color)
     draw.text((10, 30), date_str, font=font_date, fill=date_color)
 
-    # 2. Roteer het blokje 180° (net als het hele scherm)
     img_rot = img.rotate(180)
-
-    # 3. Zet om naar RGB565
     rgb565 = bytearray()
     for pixel in img_rot.getdata():
         r = pixel[0] >> 3
@@ -128,12 +109,10 @@ def update_clock_area(btc_color=(247,147,26)):
         rgb565.append(val & 0xFF)
         rgb565.append((val >> 8) & 0xFF)
 
-    # 4. Bereken framebuffer offset voor *geroteerde* klokpositie!
     fb_x = WIDTH - CLOCK_X - CLOCK_W
     fb_y = HEIGHT - CLOCK_Y - CLOCK_H
     fb_offset = (fb_y * WIDTH + fb_x) * 2
 
-    # 5. Schrijf pixelblokken rij voor rij naar framebuffer
     with open(FRAMEBUFFER, "r+b") as f:
         for row in range(CLOCK_H):
             f.seek(fb_offset + row * WIDTH * 2)
@@ -141,24 +120,32 @@ def update_clock_area(btc_color=(247,147,26)):
             end = start + CLOCK_W * 2
             f.write(rgb565[start:end])
 
-def update_coin_value_area(value_str, coin_color=(255,255,255)):
+def update_coin_value_area(coin_symbol, coin_value, coin_color=(255,255,255)):
     """
-    Snijdt coin value gebied uit cached achtergrond (in 0° orientatie), tekent de prijs erop,
-    roteert het blokje, en schrijft het naar de juiste plek in framebuffer.
+    Overlay coin value box rechts onderin met naam in kleur en waarde in wit.
     """
     global _full_bg_cache
     if '_full_bg_cache' not in globals():
-        return  # Geen achtergrond beschikbaar
+        return
 
-    img = _full_bg_cache.crop((COIN_X, COIN_Y, COIN_X + COIN_W, COIN_Y + COIN_H))
+    img = _full_bg_cache.crop((COIN_BOX_X, COIN_BOX_Y, COIN_BOX_X + COIN_BOX_W, COIN_BOX_Y + COIN_BOX_H))
     draw = ImageDraw.Draw(img)
 
-    w, h = draw.textbbox((0, 0), value_str, font=font_value)[2:]
-    # Tekst centreren in het coin value gebied
-    draw.text(((COIN_W - w)//2, (COIN_H - h)//2), value_str, font=font_value, fill=coin_color)
+    symbol_text = coin_symbol.upper()
+    value_text = "$" + (str(coin_value) if coin_value is not None else "N/A")
+
+    symbol_w, symbol_h = draw.textbbox((0,0), symbol_text, font=font_main)[2:]
+    symbol_x = (COIN_BOX_W - symbol_w)//2
+    symbol_y = 0
+
+    value_w, value_h = draw.textbbox((0,0), value_text, font=font_value)[2:]
+    value_x = (COIN_BOX_W - value_w)//2
+    value_y = symbol_y + symbol_h + 4
+
+    draw.text((symbol_x, symbol_y), symbol_text, font=font_main, fill=coin_color)
+    draw.text((value_x, value_y), value_text, font=font_value, fill=(255,255,255))
 
     img_rot = img.rotate(180)
-
     rgb565 = bytearray()
     for pixel in img_rot.getdata():
         r = pixel[0] >> 3
@@ -168,13 +155,13 @@ def update_coin_value_area(value_str, coin_color=(255,255,255)):
         rgb565.append(val & 0xFF)
         rgb565.append((val >> 8) & 0xFF)
 
-    fb_x = WIDTH - COIN_X - COIN_W
-    fb_y = HEIGHT - COIN_Y - COIN_H
+    fb_x = WIDTH - COIN_BOX_X - COIN_BOX_W
+    fb_y = HEIGHT - COIN_BOX_Y - COIN_BOX_H
     fb_offset = (fb_y * WIDTH + fb_x) * 2
 
     with open(FRAMEBUFFER, "r+b") as f:
-        for row in range(COIN_H):
+        for row in range(COIN_BOX_H):
             f.seek(fb_offset + row * WIDTH * 2)
-            start = row * COIN_W * 2
-            end = start + COIN_W * 2
+            start = row * COIN_BOX_W * 2
+            end = start + COIN_BOX_W * 2
             f.write(rgb565[start:end])

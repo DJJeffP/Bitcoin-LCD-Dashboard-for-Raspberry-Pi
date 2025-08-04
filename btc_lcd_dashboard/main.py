@@ -41,22 +41,21 @@ def load_coins(config_file="coins.json"):
     return coins
 
 def main():
-    calib = load_calibration()  # Kalibratie altijd eerst
+    calib = load_calibration()
     clear_framebuffer()
     coins = load_coins()
     btc_coin = next(c for c in coins if c["id"] == "btc")
     btc_color = hex_to_rgb(btc_coin["color"])
 
-    # Start prijs-thread
     t_price = threading.Thread(target=price_updater, args=(coins,), daemon=True)
     t_price.start()
-    # Start double-tap detector thread
     t_touch = threading.Thread(target=double_tap_detector, args=(switch_to_setup,), daemon=True)
     t_touch.start()
 
     last_rot_time = time.time()
     coin_index = 0
     last_clock_str = ""
+    last_coin_symbol = ""
     last_coin_val_str = ""
 
     while True:
@@ -64,11 +63,12 @@ def main():
             now = time.time()
             t_struct = time.localtime(now)
             now_str = time.strftime("%H:%M:%S", t_struct)
-            date_str = time.strftime("%a %d %b %Y", t_struct)
+
             btc_price = get_cached_price(btc_coin)
             show_coin = coins[coin_index]
-            show_coin_price = get_cached_price(show_coin) if show_coin["id"] != "btc" else None
-            coin_label = show_coin["symbol"]
+            show_coin_price = get_cached_price(show_coin)
+            coin_symbol = show_coin["symbol"]
+            coin_color = hex_to_rgb(show_coin["color"])
             coin_val_str = "$" + (str(show_coin_price) if show_coin_price is not None else "N/A")
 
             redraw_full = False
@@ -79,18 +79,19 @@ def main():
 
             if redraw_full:
                 draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
-                last_coin_val_str = coin_val_str
-                last_clock_str = now_str
+                last_coin_symbol = ""  # Force update overlay after redraw
+                last_coin_val_str = ""
+                last_clock_str = ""
 
-            if now_str != last_clock_str:
-                update_clock_area()
-                last_clock_str = now_str
-
-            if coin_val_str != last_coin_val_str:
-                update_coin_value_area(coin_val_str)
+            # **Altijd overlay coin box als symbool of waarde wijzigt**
+            if coin_symbol != last_coin_symbol or coin_val_str != last_coin_val_str or redraw_full:
+                update_coin_value_area(coin_symbol, show_coin_price, coin_color)
+                last_coin_symbol = coin_symbol
                 last_coin_val_str = coin_val_str
-            if now_str != last_clock_str:
-                update_clock_area(btc_color)  # GEEF BTC-KLEUR MEE!
+
+            # **Overlay klok altijd als tijd wijzigt**
+            if now_str != last_clock_str or redraw_full:
+                update_clock_area(btc_color)
                 last_clock_str = now_str
 
             time.sleep(0.1)
