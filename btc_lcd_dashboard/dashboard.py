@@ -5,6 +5,8 @@ Dashboard-drawing: volledig scherm en partiële updates (clock/coin value).
 
 from PIL import Image, ImageDraw, ImageFont
 import os
+import time
+
 
 # Schermparameters
 WIDTH, HEIGHT = 480, 320
