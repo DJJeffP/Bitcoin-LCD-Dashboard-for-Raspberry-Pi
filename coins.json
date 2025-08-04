@@ -16,7 +16,7 @@
       "color": "#FF6600",
       "coingecko_id": "monero",
       "binance_symbol": "XMRUSDT",
-      "show": true
+      "show": false
     },
     {
       "id": "cfx",
