@@ -1,6 +1,3 @@
-# --- BOOKMARK: Altcoin overlay-only versie, BTC in bg, 2024-08-05 ---
-# Deze versie werkt als de "gouden basis" voor altcoin overlays!
-
 import threading
 import time
 import sys
@@ -36,17 +33,21 @@ def switch_to_dashboard():
     print(">>> Returning to DASHBOARD mode!")
     ui_mode['dashboard'] = True
 
-def load_coins(config_file="coins.json"):
+def reload_coins(config_file="coins.json", show_all=False):
     with open(config_file, "r") as f:
         cfg = json.load(f)
+    if show_all:
+        return cfg.get("coins", [])
     coins = [coin for coin in cfg.get("coins", []) if coin.get("show", True)]
+    if not coins:
+        coins = [{"id": "btc", "symbol": "BTC", "color": "#f7931a", "show": True}]
     return coins
 
 
 def main():
     calib = load_calibration()
     clear_framebuffer()
-    coins = load_coins()
+    coins = reload_coins()
     btc_coin = next(c for c in coins if c["id"] == "btc")
     btc_color = hex_to_rgb(btc_coin["color"])
 
@@ -58,16 +59,12 @@ def main():
     last_rot_time = time.time()
     coin_index = 0
     last_clock_str = ""
+    _prev_coin_box = None
 
-    # Eerste draw
     btc_price = get_cached_price(btc_coin)
     show_coin = coins[coin_index]
     show_coin_price = get_cached_price(show_coin)
-    #draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
-        # Na redraw (bijv. bij coin-rotatie):
     draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
-    _prev_coin_box = None  # Reset na elke redraw!
-
 
     while True:
         if ui_mode['dashboard']:
@@ -76,21 +73,22 @@ def main():
             now_str = time.strftime("%H:%M:%S", t_struct)
 
             btc_price = get_cached_price(btc_coin)
-            show_coin = coins[coin_index]
-            show_coin_price = get_cached_price(show_coin)
-            coin_symbol = show_coin["symbol"]
-            coin_color = hex_to_rgb(show_coin["color"])
 
-            # Coin rotatie
+            # Live reload na elke rotatie
             if now - last_rot_time >= 20:
+                coins = reload_coins()
                 coin_index = (coin_index + 1) % len(coins)
                 last_rot_time = now
+                show_coin = coins[coin_index]
+                show_coin_price = get_cached_price(show_coin)
                 draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
-                _prev_coin_box = None  # Reset na elke redraw!
                 last_clock_str = ""
+                _prev_coin_box = None
+            else:
+                show_coin = coins[coin_index]
+                show_coin_price = get_cached_price(show_coin)
 
-            # Overlay coin box als variabele overlay ONDER BTC
-            update_coin_value_area_variable(coin_symbol, show_coin_price, coin_color, textbox_offset)
+            update_coin_value_area_variable(show_coin["symbol"], show_coin_price, hex_to_rgb(show_coin["color"]), textbox_offset)
 
             if now_str != last_clock_str:
                 update_clock_area(btc_color)
@@ -98,7 +96,8 @@ def main():
 
             time.sleep(0.1)
         else:
-            setup_touch_listener(coins, switch_to_dashboard)
+            # LET OP: laadt altijd ALLE coins in setup, niet gefilterd!
+            setup_touch_listener(reload_coins(config_file="coins.json", show_all=True), switch_to_dashboard)
             time.sleep(0.1)
 
 if __name__ == "__main__":
