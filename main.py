@@ -43,7 +43,6 @@ def reload_coins(config_file="coins.json", show_all=False):
         coins = [{"id": "btc", "symbol": "BTC", "color": "#f7931a", "show": True}]
     return coins
 
-
 def main():
     calib = load_calibration()
     clear_framebuffer()
@@ -77,6 +76,9 @@ def main():
             # Live reload na elke rotatie
             if now - last_rot_time >= 20:
                 coins = reload_coins()
+                if not coins:
+                    coins = [{"id": "btc", "symbol": "BTC", "color": "#f7931a", "show": True}]
+                coin_index = coin_index % len(coins)
                 coin_index = (coin_index + 1) % len(coins)
                 last_rot_time = now
                 show_coin = coins[coin_index]
@@ -96,8 +98,8 @@ def main():
 
             time.sleep(0.1)
         else:
-            # LET OP: laadt altijd ALLE coins in setup, niet gefilterd!
-            setup_touch_listener(reload_coins(config_file="coins.json", show_all=True), switch_to_dashboard)
+            # Setup altijd met alle coins, niet gefilterd!
+            setup_touch_listener(reload_coins(show_all=True), switch_to_dashboard)
             time.sleep(0.1)
 
 if __name__ == "__main__":

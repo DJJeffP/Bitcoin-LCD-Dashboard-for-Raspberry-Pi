@@ -1,4 +1,3 @@
-# setup_screen.py
 """
 Setup-/zoek-scherm: coin toggles, search, keyboard, scroll, save.
 """
@@ -6,7 +5,6 @@ Setup-/zoek-scherm: coin toggles, search, keyboard, scroll, save.
 from PIL import Image, ImageDraw, ImageFont
 import json
 
-# Zet je fonts, afmetingen, etc.
 WIDTH, HEIGHT = 480, 320
 FONT_SMALL = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 CONFIG_FILE = "coins.json"
@@ -41,11 +39,10 @@ def draw_coin_toggle_list(coins, scroll=0, search_text="", search_focused=False)
     scroll_down_y = 105 + 6*40
     draw.polygon([(scroll_up_x, scroll_up_y), (scroll_up_x+30, scroll_up_y), (scroll_up_x+15, scroll_up_y-20)], fill=(255,255,255))
     draw.polygon([(scroll_down_x, scroll_down_y), (scroll_down_x+30, scroll_down_y), (scroll_down_x+15, scroll_down_y+20)], fill=(255,255,255))
-    #save button location
     save_left = WIDTH - 180
     save_right = WIDTH - 50
-    save_top = 20
-    save_bottom = 70
+    save_top = HEIGHT - 70
+    save_bottom = HEIGHT - 20
     draw.rectangle([save_left, save_top, save_right, save_bottom], fill=(60,130,60))
     draw.text((save_left+15, save_top+12), "SAVE", fill=(255,255,255), font=font_search)
     keys = [
@@ -87,12 +84,10 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
     save_right = WIDTH - 50
     save_top = HEIGHT - 70
     save_bottom = HEIGHT - 20
-    # Touche-handler
     if save_left <= x <= save_right and save_top <= y <= save_bottom:
         save_settings(coins)
         switch_to_dashboard()
         return True, scroll, search_text, False
-
     scroll_up_x = WIDTH - 60
     scroll_up_y = 105
     if scroll_up_x <= x <= scroll_up_x+30 and scroll_up_y-20 <= y <= scroll_up_y+10 and scroll > 0:
@@ -132,7 +127,7 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
                 return False, scroll, search_text, False
     return False, scroll, search_text, False
 
-def setup_touch_listener(reload_coins(show_all=True), switch_to_dashboard):
+def setup_touch_listener(coins, switch_to_dashboard):
     import evdev
     device = evdev.InputDevice('/dev/input/event0')
     raw_x, raw_y = 0, 0
@@ -167,7 +162,3 @@ def save_settings(coins):
     with open("coins.json", "w") as f:
         json.dump({"coins": coins}, f, indent=2)
     print("Coins settings saved.")
-
-
-# In je Save-knop handler:
-# save_settings(coins)
