@@ -13,14 +13,14 @@ BG_FOLDER = "backgrounds"
 BG_FALLBACK = os.path.join(BG_FOLDER, "btc-bg.png")
 
 # Klok regio
-CLOCK_X = WIDTH - 160
-CLOCK_Y = 16
+CLOCK_X = WIDTH + 5
+CLOCK_Y = 160
 CLOCK_W = 150
 CLOCK_H = 60
 
 # Coin value regio
-COIN_X = 170
-COIN_Y = 135
+COIN_X = 60
+COIN_Y = 20
 COIN_W = 240
 COIN_H = 55
 
