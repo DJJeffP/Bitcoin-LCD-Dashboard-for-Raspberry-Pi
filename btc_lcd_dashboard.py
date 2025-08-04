@@ -202,7 +202,7 @@ def handle_setup_touch(x, y):
     if 50 <= x <= 120 and 235 <= y <= 325:
         print("[SETUP] SAVE button touched! Returning to dashboard.")
         switch_to_dashboard()
-        return True  # <--- Return True if SAVE was touched
+        return True  # Important! Tell the loop to exit.
     return False
 
 def setup_touch_listener():
@@ -216,11 +216,13 @@ def setup_touch_listener():
                 raw_x = event.value
             elif event.code == evdev.ecodes.ABS_Y:
                 raw_y = event.value
+        # Only need single tap here!
         elif event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_TOUCH and event.value == 1:
             x, y = scale_touch(raw_x, raw_y)
             print(f"[DEBUG][SETUP] Touch at x={x}, y={y}")
-            if handle_setup_touch(x, y):  # <--- If button was hit, exit immediately
+            if handle_setup_touch(x, y):  # If button was hit, exit immediately
                 break
+
 
 # ==== DASHBOARD <--> SETUP MODE SWITCH ====
 def switch_to_setup():
