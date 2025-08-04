@@ -449,6 +449,11 @@ def double_tap_detector(trigger_callback):
 
 # ==== MAIN PROGRAM ====
 def main():
+    # ---- Touch Calibration (runs before anything else) ----
+    global calib
+    calib = load_calibration()  # This will block and calibrate if not done yet
+
+    # ---- Only now do the rest of your setup ----
     clear_framebuffer()
     coins = load_coins()
     btc_coin = next(c for c in coins if c["id"] == "btc")
