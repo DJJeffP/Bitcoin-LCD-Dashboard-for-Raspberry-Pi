@@ -11,11 +11,6 @@ FRAMEBUFFER = "/dev/fb1"
 WIDTH, HEIGHT = 480, 320
 TOUCH_DEVICE = '/dev/input/event0'
 
-def scale_touch(x, y):
-    pixel_x = int(x * 480 / 3592)
-    pixel_y = int(y * 320 / 3732)
-    return pixel_x, pixel_y
-
 def is_in_clock_area(x, y):
     return x >= 428
 
@@ -25,6 +20,7 @@ BG_FOLDER = "backgrounds"
 BG_FALLBACK = os.path.join(BG_FOLDER, "btc-bg.png")
 ROTATE_SECS = 20
 PRICE_UPDATE_SECS = 60  # Cache verversen
+CALIBRATION_FILE = "touch_calibration.json"
 
 # ==== Fonts ====
 FONT_BIG = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -33,6 +29,103 @@ font_main = ImageFont.truetype(FONT_BIG, 36)
 font_value = ImageFont.truetype(FONT_BIG, 48)
 font_time = ImageFont.truetype(FONT_BIG, 28)
 font_date = ImageFont.truetype(FONT_SMALL, 20)
+
+# === Touch screen Calibration ===
+
+# === Use calibration data in scaling ===
+def load_calibration():
+    if not os.path.isfile(CALIBRATION_FILE):
+        print("[INFO] No calibration file found, running calibration...")
+        calibrate_touch()
+    with open(CALIBRATION_FILE, "r") as f:
+        return json.load(f)
+
+calib = None
+def scale_touch(x, y):
+    global calib
+    if calib is None:
+        calib = load_calibration()
+    # Map raw x/y to pixel x/y using calibration data
+    raw_min_x = calib["raw_min_x"]
+    raw_max_x = calib["raw_max_x"]
+    raw_min_y = calib["raw_min_y"]
+    raw_max_y = calib["raw_max_y"]
+    pixel_x = int((x - raw_min_x) * WIDTH / (raw_max_x - raw_min_x))
+    pixel_y = int((y - raw_min_y) * HEIGHT / (raw_max_y - raw_min_y))
+    pixel_x = max(0, min(WIDTH-1, pixel_x))
+    pixel_y = max(0, min(HEIGHT-1, pixel_y))
+    return pixel_x, pixel_y
+
+# === Calibration drawing and logic ===
+def draw_crosshair(x, y, msg=""):
+    image = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    size = 20
+    draw.line([(x-size, y), (x+size, y)], fill=(0,255,0), width=3)
+    draw.line([(x, y-size), (x, y+size)], fill=(0,255,0), width=3)
+    font = ImageFont.truetype(FONT_SMALL, 24)
+    draw.text((WIDTH//2 - 80, HEIGHT-40), msg, fill=(255,255,255), font=font)
+    # Rotate for LCD!
+    image = image.rotate(180)
+    rgb565 = bytearray()
+    for pixel in image.getdata():
+        r = pixel[0] >> 3
+        g = pixel[1] >> 2
+        b = pixel[2] >> 3
+        value = (r << 11) | (g << 5) | b
+        rgb565.append(value & 0xFF)
+        rgb565.append((value >> 8) & 0xFF)
+    with open(FRAMEBUFFER, 'wb') as f:
+        f.write(rgb565)
+
+# === Touchscreen calibration logic ===
+def calibrate_touch():
+    print("[CALIBRATION] Starting touchscreen calibration...")
+    points = [
+        ("Top Left", 30, 30),
+        ("Top Right", WIDTH-31, 30),
+        ("Bottom Right", WIDTH-31, HEIGHT-31),
+        ("Bottom Left", 30, HEIGHT-31),
+        ("Center", WIDTH//2, HEIGHT//2),
+    ]
+    raw_points = []
+    device = evdev.InputDevice(TOUCH_DEVICE)
+
+    for name, x, y in points:
+        draw_crosshair(x, y, f"Touch the {name} cross")
+        print(f"[CALIBRATION] Waiting for touch at {name} ({x},{y})...")
+        got_tap = False
+        while not got_tap:
+            raw_x, raw_y = None, None
+            for event in device.read_loop():
+                if event.type == evdev.ecodes.EV_ABS:
+                    if event.code == evdev.ecodes.ABS_X:
+                        raw_x = event.value
+                    elif event.code == evdev.ecodes.ABS_Y:
+                        raw_y = event.value
+                elif event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_TOUCH and event.value == 0:
+                    if raw_x is not None and raw_y is not None:
+                        raw_points.append((raw_x, raw_y))
+                        print(f"[CALIBRATION] Got raw ({raw_x}, {raw_y}) for {name}")
+                        got_tap = True
+                        break
+            if got_tap:
+                break
+
+    # Calculate min/max for x and y from calibration taps
+    xs, ys = zip(*raw_points)
+    calibration_data = {
+        "raw_min_x": int(min(xs)),
+        "raw_max_x": int(max(xs)),
+        "raw_min_y": int(min(ys)),
+        "raw_max_y": int(max(ys)),
+        "points": raw_points,
+    }
+    with open(CALIBRATION_FILE, "w") as f:
+        json.dump(calibration_data, f, indent=2)
+    print("[CALIBRATION] Calibration complete and saved.")
+    time.sleep(1)
+
 
 def load_coins(config_file=CONFIG_FILE):
     with open(config_file, "r") as f:
