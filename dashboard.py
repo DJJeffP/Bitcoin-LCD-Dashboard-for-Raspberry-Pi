@@ -1,3 +1,6 @@
+# --- BOOKMARK: Altcoin overlay-only versie, BTC in bg, 2024-08-05 ---
+# Deze versie werkt als de "gouden basis" voor altcoin overlays!
+
 import os
 import time
 from PIL import Image, ImageDraw, ImageFont
@@ -110,7 +113,7 @@ def update_clock_area(btc_color=(247,147,26)):
             f.write(rgb565[start:end])
 
 def update_coin_value_area_variable(coin_symbol, coin_value, coin_color=(255,255,255), right_offset=60):
-    global _full_bg_cache, _btc_price_y, _btc_price_h
+    global _full_bg_cache, _btc_price_y, _btc_price_h, _prev_coin_box
     if '_full_bg_cache' not in globals():
         return
     if '_btc_price_y' not in globals() or '_btc_price_h' not in globals():
@@ -131,16 +134,25 @@ def update_coin_value_area_variable(coin_symbol, coin_value, coin_color=(255,255
     box_h = symbol_h + value_h + 25
     box_x = (WIDTH - box_w)//2 + right_offset
     box_y = _btc_price_y + _btc_price_h + 20
-    if box_y + box_h > HEIGHT:
-        box_y = HEIGHT - box_h - 10
-    if box_x < 0:
-        box_x = 0
-    if box_x + box_w > WIDTH:
-        box_x = WIDTH - box_w
 
+    # UNION met vorige box voor anti-ghosting
+    if '_prev_coin_box' in globals() and _prev_coin_box:
+        prev_x, prev_y, prev_w, prev_h = _prev_coin_box
+        min_x = min(box_x, prev_x)
+        min_y = min(box_y, prev_y)
+        max_x = max(box_x + box_w, prev_x + prev_w)
+        max_y = max(box_y + box_h, prev_y + prev_h)
+        box_x, box_y = min_x, min_y
+        box_w, box_h = max_x - min_x, max_y - min_y
+
+    # Sla nieuwe box op voor de volgende iteratie
+    _prev_coin_box = (box_x, box_y, box_w, box_h)
+
+    # Knip uit bg en teken tekst
     img = _full_bg_cache.crop((box_x, box_y, box_x + box_w, box_y + box_h))
     draw = ImageDraw.Draw(img)
 
+    # Tekst centreren
     symbol_x = (box_w - symbol_w)//2
     symbol_y = 7
     value_x = (box_w - value_w)//2
@@ -169,3 +181,4 @@ def update_coin_value_area_variable(coin_symbol, coin_value, coin_color=(255,255
             start = row * box_w * 2
             end = start + box_w * 2
             f.write(rgb565[start:end])
+

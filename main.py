@@ -1,3 +1,6 @@
+# --- BOOKMARK: Altcoin overlay-only versie, BTC in bg, 2024-08-05 ---
+# Deze versie werkt als de "gouden basis" voor altcoin overlays!
+
 import threading
 import time
 import sys
@@ -59,7 +62,11 @@ def main():
     btc_price = get_cached_price(btc_coin)
     show_coin = coins[coin_index]
     show_coin_price = get_cached_price(show_coin)
+    #draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
+        # Na redraw (bijv. bij coin-rotatie):
     draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
+    _prev_coin_box = None  # Reset na elke redraw!
+
 
     while True:
         if ui_mode['dashboard']:
@@ -78,6 +85,7 @@ def main():
                 coin_index = (coin_index + 1) % len(coins)
                 last_rot_time = now
                 draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
+                _prev_coin_box = None  # Reset na elke redraw!
                 last_clock_str = ""
 
             # Overlay coin box als variabele overlay ONDER BTC
