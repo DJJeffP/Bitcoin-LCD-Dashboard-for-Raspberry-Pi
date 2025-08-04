@@ -39,8 +39,9 @@ def switch_to_dashboard():
 def load_coins(config_file="coins.json"):
     with open(config_file, "r") as f:
         cfg = json.load(f)
-    coins = [coin for coin in cfg.get("coins", [])]
+    coins = [coin for coin in cfg.get("coins", []) if coin.get("show", True)]
     return coins
+
 
 def main():
     calib = load_calibration()
