@@ -10,7 +10,6 @@ from touchscreen import double_tap_detector
 from price import price_updater, get_cached_price
 from utils import clear_framebuffer, hex_to_rgb
 import json
-DEBUG = True
 
 ui_mode = {'dashboard': True}
 
@@ -56,12 +55,8 @@ def main():
     coin_index = 0
     last_clock_str = ""
 
-    global _prev_btc_box, _prev_coin_box
-    _prev_btc_box = None
-    _prev_coin_box = None
-
-    # On first run, always draw dashboard:
-    redraw_full = True
+    # Opstart: altijd full redraw
+    draw_dashboard(get_cached_price(btc_coin), btc_color, coins[coin_index], get_cached_price(coins[coin_index]))
 
     while True:
         if ui_mode['dashboard']:
@@ -81,32 +76,21 @@ def main():
                 last_rot_time = now
                 draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
                 last_clock_str = ""
-                _prev_btc_box = None
-                _prev_coin_box = None
 
             # --- Overlay BTC box ---
             btc_top = "BTC"
             btc_value = "$" + (str(btc_price) if btc_price is not None else "N/A")
             btc_y = _btc_label_y
             btc_color = hex_to_rgb(btc_coin["color"])
-            _prev_btc_box = draw_text_overlay_box(
-                btc_top, btc_value, btc_color, textbox_offset, btc_y, prev_box=_prev_btc_box
-            )
-
-            print("[DEBUG] BTC overlay: top:", btc_top, "value:", btc_value, "y:", btc_y)
-            print("[DEBUG] COIN overlay: top:", coin_top, "value:", coin_value, "y:", coin_y, "color:", coin_color)
-
+            draw_text_overlay_box(btc_top, btc_value, btc_color, textbox_offset, btc_y)
 
             # --- Overlay coin box onder BTC ---
             coin_top = show_coin["symbol"].upper()
             coin_value = "$" + (str(show_coin_price) if show_coin_price is not None else "N/A")
             coin_color = hex_to_rgb(show_coin["color"])
-            coin_y = _prev_btc_box[1] + _prev_btc_box[3] + 20 if _prev_btc_box else (_btc_price_y + _btc_price_h + 20)
-            _prev_coin_box = draw_text_overlay_box(
-                coin_top, coin_value, coin_color, textbox_offset, coin_y, prev_box=_prev_coin_box
-            )
+            coin_y = _btc_price_y + _btc_price_h + 20
+            draw_text_overlay_box(coin_top, coin_value, coin_color, textbox_offset, coin_y)
 
-            # Klok overlay
             if now_str != last_clock_str:
                 update_clock_area(btc_color)
                 last_clock_str = now_str
@@ -115,8 +99,6 @@ def main():
         else:
             setup_touch_listener(coins, switch_to_dashboard)
             time.sleep(0.1)
-
-
 
 if __name__ == "__main__":
     try:

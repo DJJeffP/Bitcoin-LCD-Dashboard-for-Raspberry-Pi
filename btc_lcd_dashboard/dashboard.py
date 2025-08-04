@@ -1,4 +1,3 @@
-# dashboard.py
 import os
 import time
 from PIL import Image, ImageDraw, ImageFont
@@ -109,16 +108,10 @@ def update_clock_area(btc_color=(247,147,26)):
             end = start + CLOCK_W * 2
             f.write(rgb565[start:end])
 
-def draw_text_overlay_box(
-    top_text, bottom_text,
-    top_color, offset_x, y_pos,
-    prev_box=None, bg_img=None
-):
-    if bg_img is None:
-        global _full_bg_cache
-        if '_full_bg_cache' not in globals():
-            return None
-        bg_img = _full_bg_cache
+def draw_text_overlay_box(top_text, bottom_text, top_color, offset_x, y_pos):
+    global _full_bg_cache
+    if '_full_bg_cache' not in globals():
+        return
 
     symbol_bbox = font_main.getbbox(top_text)
     symbol_w = symbol_bbox[2] - symbol_bbox[0]
@@ -127,20 +120,10 @@ def draw_text_overlay_box(
     value_w = value_bbox[2] - value_bbox[0]
     value_h = value_bbox[3] - value_bbox[1]
 
-    box_w = max(symbol_w, value_w) + 40  # 20px marge links/rechts
-    box_h = symbol_h + value_h + 25      # marge boven/onder
+    box_w = max(symbol_w, value_w) + 40  # marge
+    box_h = symbol_h + value_h + 25
     box_x = (WIDTH - box_w)//2 + offset_x
     box_y = y_pos
-
-    if prev_box:
-        prev_x, prev_y, prev_w, prev_h = prev_box
-        min_x = min(box_x, prev_x)
-        min_y = min(box_y, prev_y)
-        max_x = max(box_x + box_w, prev_x + prev_w)
-        max_y = max(box_y + box_h, prev_y + prev_h)
-        box_x, box_y = min_x, min_y
-        box_w, box_h = max_x - min_x, max_y - min_y
-
     if box_y + box_h > HEIGHT:
         box_y = HEIGHT - box_h - 10
     if box_x < 0:
@@ -148,7 +131,7 @@ def draw_text_overlay_box(
     if box_x + box_w > WIDTH:
         box_x = WIDTH - box_w
 
-    img = bg_img.crop((box_x, box_y, box_x + box_w, box_y + box_h))
+    img = _full_bg_cache.crop((box_x, box_y, box_x + box_w, box_y + box_h))
     draw = ImageDraw.Draw(img)
 
     symbol_x = (box_w - symbol_w)//2
@@ -179,7 +162,3 @@ def draw_text_overlay_box(
             start = row * box_w * 2
             end = start + box_w * 2
             f.write(rgb565[start:end])
-    
-    print("[DRAW OVERLAY]", top_text, bottom_text, "Box:", (box_x, box_y, box_w, box_h))
-
-    return (box_x, box_y, box_w, box_h)
