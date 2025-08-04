@@ -382,33 +382,61 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
     save_top = HEIGHT - 70
     save_bottom = HEIGHT - 20
     if save_left <= x <= save_right and save_top <= y <= save_bottom:
-        print("[SETUP] SAVE button touched! Saving coins.json and returning to dashboard.")
+        if DEBUG:
+            print("[DEBUG] SAVE button touched!")
         with open(CONFIG_FILE, "w") as f:
             json.dump({"coins": coins}, f, indent=2)
         switch_to_dashboard()
         return True, scroll, search_text, False
 
-    # 2. Search bar focus
+    # 2. Scroll up button (top right, above coin list)
+    scroll_up_x = WIDTH - 60
+    scroll_up_y = 105
+    if scroll_up_x <= x <= scroll_up_x+30 and scroll_up_y-20 <= y <= scroll_up_y+10 and scroll > 0:
+        if DEBUG:
+            print("[DEBUG] Scroll UP touched")
+        return False, scroll-1, search_text, search_focused
+
+    # 3. Scroll down button (bottom right, below coin list)
+    scroll_down_x = WIDTH - 60
+    scroll_down_y = 105 + 6*40
+    if scroll_down_x <= x <= scroll_down_x+30 and scroll_down_y <= y <= scroll_down_y+20 and (scroll+6) < len(matches):
+        if DEBUG:
+            print("[DEBUG] Scroll DOWN touched")
+        return False, scroll+1, search_text, search_focused
+
+    # 4. Search bar focus
     if 20 <= x <= WIDTH-20 and 55 <= y <= 95:
+        if DEBUG:
+            print("[DEBUG] Search bar focused")
         return False, scroll, search_text, True
 
-    # 3. Keyboard keys (only if search focused)
+    # 5. Keyboard keys (only if search focused)
+    keys = [
+        "QWERTYUIOP",
+        "ASDFGHJKL",
+        "ZXCVBNM<-"
+    ]
+    key_w = 38
+    key_h = 38
+    key_start_y = HEIGHT - 160
+    total_key_row_width = 10 * key_w + 9 * 4  # 10 keys, 9 gaps
+    key_start_x = (WIDTH - total_key_row_width) // 2
     if search_focused:
-        key_w = 38
-        key_h = 38
-        key_start_y = HEIGHT-160
-        for row_idx, row in enumerate(["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM<-"]):
+        for row_idx, row in enumerate(keys):
             yk = key_start_y + row_idx * (key_h + 4)
             for col_idx, char in enumerate(row):
-                xk = 200 + col_idx * (key_w + 4)
+                xk = key_start_x + col_idx * (key_w + 4)
                 if xk <= x <= xk+key_w and yk <= y <= yk+key_h:
+                    if DEBUG:
+                        print(f"[DEBUG] Key '{char}' pressed")
                     if char == "<":
                         search_text = search_text[:-1]
                     else:
                         search_text += char
                     return False, scroll, search_text, True
 
-    # 4. Coin toggles (hitbox is name text or box, not row)
+    # 6. Coin toggles (hitbox is name text or box, not row)
     for i in range(6):
         y_coin = 105 + i*40
         if i < len(matches):
@@ -425,19 +453,9 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
                 (x_name_start - 8 <= x <= x_name_end + 8)) and y_coin <= y <= y_coin+30:
                 orig_idx = coins.index(coin)
                 coins[orig_idx]["show"] = not coins[orig_idx].get("show", True)
-                print(f"[SETUP] Toggled {coin['symbol']}, now show={coins[orig_idx]['show']}")
+                if DEBUG:
+                    print(f"[DEBUG] Toggled {coin['symbol']}, now show={coins[orig_idx]['show']}")
                 return False, scroll, search_text, False
-
-    # 5. Scroll up button
-    if (WIDTH - 60) <= x <= (WIDTH - 30) and (105-20) <= y <= (105+10):
-        if scroll > 0:
-            return False, scroll-1, search_text, search_focused
-
-    # 6. Scroll down button
-    if (WIDTH - 60) <= x <= (WIDTH - 30) and (105+6*40) <= y <= (105+6*40+20):
-        if (scroll+6) < len(matches):
-            return False, scroll+1, search_text, search_focused
-
 
     # 7. Click anywhere else: remove focus from search
     return False, scroll, search_text, False
