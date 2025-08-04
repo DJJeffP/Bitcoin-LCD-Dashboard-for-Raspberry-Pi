@@ -10,16 +10,6 @@ from PIL import Image, ImageDraw, ImageFont
 FRAMEBUFFER = "/dev/fb1"
 WIDTH, HEIGHT = 480, 320
 TOUCH_DEVICE = '/dev/input/event0'
-
-def is_in_clock_area(x, y):
-    return x >= 428
-
-# ==== Config ====
-CONFIG_FILE = "coins.json"
-BG_FOLDER = "backgrounds"
-BG_FALLBACK = os.path.join(BG_FOLDER, "btc-bg.png")
-ROTATE_SECS = 20
-PRICE_UPDATE_SECS = 60  # Cache verversen
 CALIBRATION_FILE = "touch_calibration.json"
 
 # ==== Fonts ====
@@ -30,33 +20,14 @@ font_value = ImageFont.truetype(FONT_BIG, 48)
 font_time = ImageFont.truetype(FONT_BIG, 28)
 font_date = ImageFont.truetype(FONT_SMALL, 20)
 
-# === Touch screen Calibration ===
+# ==== UI MODE ====
+ui_mode = {'dashboard': True}  # Shared between threads
 
-# === Use calibration data in scaling ===
-def load_calibration():
-    if not os.path.isfile(CALIBRATION_FILE):
-        print("[INFO] No calibration file found, running calibration...")
-        calibrate_touch()
-    with open(CALIBRATION_FILE, "r") as f:
-        return json.load(f)
+def clear_framebuffer():
+    with open(FRAMEBUFFER, 'wb') as f:
+        f.write(bytearray([0x00, 0x00] * WIDTH * HEIGHT))
 
-calib = None
-def scale_touch(x, y):
-    global calib
-    if calib is None:
-        calib = load_calibration()
-    # Map raw x/y to pixel x/y using calibration data
-    raw_min_x = calib["raw_min_x"]
-    raw_max_x = calib["raw_max_x"]
-    raw_min_y = calib["raw_min_y"]
-    raw_max_y = calib["raw_max_y"]
-    pixel_x = int((x - raw_min_x) * WIDTH / (raw_max_x - raw_min_x))
-    pixel_y = int((y - raw_min_y) * HEIGHT / (raw_max_y - raw_min_y))
-    pixel_x = max(0, min(WIDTH-1, pixel_x))
-    pixel_y = max(0, min(HEIGHT-1, pixel_y))
-    return pixel_x, pixel_y
-
-# === Calibration drawing and logic ===
+# ==== Touchscreen Calibration ====
 def draw_crosshair(x, y, msg=""):
     image = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
     draw = ImageDraw.Draw(image)
@@ -78,7 +49,6 @@ def draw_crosshair(x, y, msg=""):
     with open(FRAMEBUFFER, 'wb') as f:
         f.write(rgb565)
 
-# === Touchscreen calibration logic ===
 def calibrate_touch():
     print("[CALIBRATION] Starting touchscreen calibration...")
     points = [
@@ -95,8 +65,8 @@ def calibrate_touch():
         draw_crosshair(x, y, f"Touch the {name} cross")
         print(f"[CALIBRATION] Waiting for touch at {name} ({x},{y})...")
         got_tap = False
+        raw_x, raw_y = None, None
         while not got_tap:
-            raw_x, raw_y = None, None
             for event in device.read_loop():
                 if event.type == evdev.ecodes.EV_ABS:
                     if event.code == evdev.ecodes.ABS_X:
@@ -112,7 +82,6 @@ def calibrate_touch():
             if got_tap:
                 break
 
-    # Calculate min/max for x and y from calibration taps
     xs, ys = zip(*raw_points)
     calibration_data = {
         "raw_min_x": int(min(xs)),
@@ -126,6 +95,37 @@ def calibrate_touch():
     print("[CALIBRATION] Calibration complete and saved.")
     time.sleep(1)
 
+def load_calibration():
+    if not os.path.isfile(CALIBRATION_FILE):
+        print("[INFO] No calibration file found, running calibration...")
+        calibrate_touch()
+    with open(CALIBRATION_FILE, "r") as f:
+        return json.load(f)
+
+calib = None
+def scale_touch(x, y):
+    global calib
+    if calib is None:
+        calib = load_calibration()
+    raw_min_x = calib["raw_min_x"]
+    raw_max_x = calib["raw_max_x"]
+    raw_min_y = calib["raw_min_y"]
+    raw_max_y = calib["raw_max_y"]
+    pixel_x = int((x - raw_min_x) * WIDTH / (raw_max_x - raw_min_x))
+    pixel_y = int((y - raw_min_y) * HEIGHT / (raw_max_y - raw_min_y))
+    pixel_x = max(0, min(WIDTH-1, pixel_x))
+    pixel_y = max(0, min(HEIGHT-1, pixel_y))
+    return pixel_x, pixel_y
+
+def is_in_clock_area(x, y):
+    return x >= 428
+
+# ==== Config ====
+CONFIG_FILE = "coins.json"
+BG_FOLDER = "backgrounds"
+BG_FALLBACK = os.path.join(BG_FOLDER, "btc-bg.png")
+ROTATE_SECS = 20
+PRICE_UPDATE_SECS = 60  # Cache verversen
 
 def load_coins(config_file=CONFIG_FILE):
     with open(config_file, "r") as f:
@@ -196,14 +196,6 @@ def hex_to_rgb(hex_color, fallback=(247,147,26)):
     except:
         return fallback
 
-def clear_framebuffer():
-    with open(FRAMEBUFFER, 'wb') as f:
-        f.write(bytearray([0x00, 0x00] * WIDTH * HEIGHT))
-
-# ==== UI MODE ====
-ui_mode = {'dashboard': True}  # Shared between threads
-
-# ==== Dashboard Drawing ====
 def draw_dashboard(btc_price, btc_color, coin, coin_price):
     coin_id = coin["id"]
     coin_bg = os.path.join(BG_FOLDER, f"{coin_id}-bg.png")
@@ -260,7 +252,6 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
     with open(FRAMEBUFFER, 'wb') as f:
         f.write(rgb565)
 
-# ==== SETUP/SEARCH SCREEN ====
 def draw_coin_toggle_list(coins, scroll=0, search_text="", search_focused=False):
     # Filter coins using search_text
     matches = []
@@ -287,7 +278,8 @@ def draw_coin_toggle_list(coins, scroll=0, search_text="", search_focused=False)
         toggle_box = [30, y, 70, y+30]
         fill = (90,230,90) if coin.get("show", True) else (130,130,130)
         draw.rectangle(toggle_box, fill=fill)
-        draw.text((80, y), f"{coin['symbol']} - {coin['name']}", fill=(255,255,255), font=font)
+        text = f"{coin['symbol']} - {coin['name']}"
+        draw.text((80, y), text, fill=(255,255,255), font=font)
     # Save button at bottom right
     save_left = WIDTH - 180
     save_right = WIDTH - 50
@@ -328,9 +320,10 @@ def draw_coin_toggle_list(coins, scroll=0, search_text="", search_focused=False)
         rgb565.append((value >> 8) & 0xFF)
     with open(FRAMEBUFFER, 'wb') as f:
         f.write(rgb565)
-    return matches
+    return matches, font
 
-def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches):
+def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches, font):
+    # 1. SAVE button is always on top!
     save_left = WIDTH - 180
     save_right = WIDTH - 50
     save_top = HEIGHT - 70
@@ -341,10 +334,12 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
             json.dump({"coins": coins}, f, indent=2)
         switch_to_dashboard()
         return True, scroll, search_text, False
-    # Search bar focus
+
+    # 2. Search bar focus
     if 20 <= x <= WIDTH-20 and 55 <= y <= 95:
         return False, scroll, search_text, True
-    # Keyboard keys (only if search focused)
+
+    # 3. Keyboard keys (only if search focused)
     if search_focused:
         key_w = 38
         key_h = 38
@@ -359,22 +354,35 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
                     else:
                         search_text += char
                     return False, scroll, search_text, True
-    # Coin toggles
+
+    # 4. Coin toggles (hitbox is name text or box, not row)
     for i in range(6):
         y_coin = 105 + i*40
-        if 30 <= x <= 70 and y_coin <= y <= y_coin+30:
-            if i < len(matches):
-                orig_idx = coins.index(matches[scroll+i])
+        if i < len(matches):
+            coin = matches[scroll+i]
+            text = f"{coin['symbol']} - {coin['name']}"
+            text_w, _ = font.getsize(text)
+            x_name_start = 80
+            x_name_end = x_name_start + text_w
+            toggle_box_x1 = 30
+            toggle_box_x2 = 70
+            # If touch is on toggle box OR on coin text (plus margin)
+            if ((toggle_box_x1 <= x <= toggle_box_x2) or
+                (x_name_start - 8 <= x <= x_name_end + 8)) and y_coin <= y <= y_coin+30:
+                orig_idx = coins.index(coin)
                 coins[orig_idx]["show"] = not coins[orig_idx].get("show", True)
-                print(f"[SETUP] Toggled {matches[scroll+i]['symbol']}, now show={coins[orig_idx]['show']}")
+                print(f"[SETUP] Toggled {coin['symbol']}, now show={coins[orig_idx]['show']}")
                 return False, scroll, search_text, False
-    # Scroll up
+
+    # 5. Scroll up
     if (WIDTH-60) <= x <= (WIDTH-30) and 90 <= y <= 120 and scroll > 0:
         return False, scroll-1, search_text, search_focused
-    # Scroll down
+
+    # 6. Scroll down
     if (WIDTH-60) <= x <= (WIDTH-30) and 340 <= y <= 360 and (scroll+6) < len(matches):
         return False, scroll+1, search_text, search_focused
-    # Click anywhere else: remove focus from search
+
+    # 7. Click anywhere else: remove focus from search
     return False, scroll, search_text, False
 
 def setup_touch_listener(coins):
@@ -385,12 +393,7 @@ def setup_touch_listener(coins):
     search_text = ""
     search_focused = False
     while not ui_mode['dashboard']:
-        matches = []
-        st = search_text.strip().lower()
-        for coin in coins:
-            if st == "" or st in coin['symbol'].lower() or st in coin['name'].lower():
-                matches.append(coin)
-        draw_coin_toggle_list(coins, scroll=scroll, search_text=search_text, search_focused=search_focused)
+        matches, font = draw_coin_toggle_list(coins, scroll=scroll, search_text=search_text, search_focused=search_focused)
         for event in device.read_loop():
             if ui_mode['dashboard']:
                 return
@@ -407,12 +410,11 @@ def setup_touch_listener(coins):
                     x, y = scale_touch(raw_x, raw_y)
                     print(f"[DEBUG][SETUP] Touch at x={x}, y={y} (on finger UP)")
                     should_exit, scroll, search_text, search_focused = handle_setup_touch(
-                        x, y, coins, scroll, search_text, search_focused, matches)
+                        x, y, coins, scroll, search_text, search_focused, matches, font)
                     if should_exit:
                         return
                     break  # redraw after every tap
 
-# ==== DASHBOARD <--> SETUP MODE SWITCH ====
 def switch_to_setup():
     if not ui_mode['dashboard']:
         return
@@ -423,7 +425,6 @@ def switch_to_dashboard():
     print(">>> Returning to DASHBOARD mode!")
     ui_mode['dashboard'] = True
 
-# ==== DOUBLE-TAP DETECTOR THREAD ====
 def double_tap_detector(trigger_callback):
     device = evdev.InputDevice(TOUCH_DEVICE)
     last_tap_time = 0
@@ -447,7 +448,6 @@ def double_tap_detector(trigger_callback):
                 else:
                     last_tap_time = now
 
-# ==== MAIN PROGRAM ====
 def main():
     # ---- Touch Calibration (runs before anything else) ----
     global calib
