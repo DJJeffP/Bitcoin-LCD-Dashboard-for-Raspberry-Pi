@@ -4,7 +4,7 @@ import sys
 import termios
 import tty
 from calibration import load_calibration
-from dashboard import draw_dashboard, update_clock_area, update_coin_value_area_variable
+from dashboard import draw_dashboard, update_clock_area, draw_text_overlay_box, textbox_offset
 from setup_screen import setup_touch_listener
 from touchscreen import double_tap_detector
 from price import price_updater, get_cached_price
@@ -58,6 +58,11 @@ def main():
     last_coin_symbol = ""
     last_coin_val_str = ""
 
+    # Voor anti-ghosting overlays:
+    global _prev_btc_box, _prev_coin_box
+    _prev_btc_box = None
+    _prev_coin_box = None
+
     while True:
         if ui_mode['dashboard']:
             now = time.time()
@@ -77,19 +82,45 @@ def main():
                 last_rot_time = now
                 redraw_full = True
 
-            if redraw_full:
+            if redraw_full or _prev_btc_box is None or _prev_coin_box is None:
                 draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
-                last_coin_symbol = ""  # Force update overlay after redraw
+                last_coin_symbol = ""
                 last_coin_val_str = ""
                 last_clock_str = ""
+                _prev_btc_box = None
+                _prev_coin_box = None
 
-            # Overlay coin value box elke keer als coin verandert of waarde wijzigt:
-            if coin_symbol != last_coin_symbol or coin_val_str != last_coin_val_str or redraw_full:
-                update_coin_value_area_variable(coin_symbol, show_coin_price, coin_color)
-                last_coin_symbol = coin_symbol
-                last_coin_val_str = coin_val_str
+            # ---- SAFE FALLBACKS VOOR GLOBALS ----
+            global _btc_label_y, _btc_price_y, _btc_price_h
+            if '_btc_label_y' not in globals():
+                _btc_label_y = int(320 * 0.35) - 36
+            if '_btc_price_y' not in globals():
+                _btc_price_y = int(320 * 0.35) + 5
+            if '_btc_price_h' not in globals():
+                _btc_price_h = 48
+            # ---- EINDE FALLBACKS ----
 
-            # Overlay klok:
+            # === OVERLAY BTC box ===
+            btc_top = "BTC"
+            btc_value = "$" + (str(btc_price) if btc_price is not None else "N/A")
+            btc_y = _btc_label_y
+            btc_color = hex_to_rgb(btc_coin["color"])
+            _prev_btc_box = draw_text_overlay_box(
+                btc_top, btc_value, btc_color, textbox_offset, btc_y, prev_box=_prev_btc_box
+            )
+
+            # === OVERLAY COIN box ===
+            coin_top = show_coin["symbol"].upper()
+            coin_value = "$" + (str(show_coin_price) if show_coin_price is not None else "N/A")
+            if _prev_btc_box:
+                coin_y = _prev_btc_box[1] + _prev_btc_box[3] + 20
+            else:
+                coin_y = _btc_price_y + _btc_price_h + 20
+            _prev_coin_box = draw_text_overlay_box(
+                coin_top, coin_value, coin_color, textbox_offset, coin_y, prev_box=_prev_coin_box
+            )
+
+            # === OVERLAY KLOK ===
             if now_str != last_clock_str or redraw_full:
                 update_clock_area(btc_color)
                 last_clock_str = now_str
@@ -111,7 +142,6 @@ if __name__ == "__main__":
         import traceback
         print("Error:", e)
         traceback.print_exc()
-        wait_for_keypress()  # <-- Wacht hier op toets voordat verder
+        wait_for_keypress()
         clear_framebuffer()
         time.sleep(1)
-
