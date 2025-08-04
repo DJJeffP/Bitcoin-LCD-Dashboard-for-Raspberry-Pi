@@ -58,7 +58,6 @@ def main():
     last_coin_symbol = ""
     last_coin_val_str = ""
 
-    # Voor anti-ghosting overlays:
     global _prev_btc_box, _prev_coin_box
     _prev_btc_box = None
     _prev_coin_box = None
@@ -89,38 +88,29 @@ def main():
                 last_clock_str = ""
                 _prev_btc_box = None
                 _prev_coin_box = None
-
-            # ---- SAFE FALLBACKS VOOR GLOBALS ----
-            global _btc_label_y, _btc_price_y, _btc_price_h
-            if '_btc_label_y' not in globals():
-                _btc_label_y = int(320 * 0.35) - 36
-            if '_btc_price_y' not in globals():
-                _btc_price_y = int(320 * 0.35) + 5
-            if '_btc_price_h' not in globals():
-                _btc_price_h = 48
-            # ---- EINDE FALLBACKS ----
-
-            # === OVERLAY BTC box ===
-            btc_top = "BTC"
-            btc_value = "$" + (str(btc_price) if btc_price is not None else "N/A")
-            btc_y = _btc_label_y
-            btc_color = hex_to_rgb(btc_coin["color"])
-            _prev_btc_box = draw_text_overlay_box(
-                btc_top, btc_value, btc_color, textbox_offset, btc_y, prev_box=_prev_btc_box
-            )
-
-            # === OVERLAY COIN box ===
-            coin_top = show_coin["symbol"].upper()
-            coin_value = "$" + (str(show_coin_price) if show_coin_price is not None else "N/A")
-            if _prev_btc_box:
-                coin_y = _prev_btc_box[1] + _prev_btc_box[3] + 20
+                # Na redraw: overlays NIET tekenen!
             else:
-                coin_y = _btc_price_y + _btc_price_h + 20
-            _prev_coin_box = draw_text_overlay_box(
-                coin_top, coin_value, coin_color, textbox_offset, coin_y, prev_box=_prev_coin_box
-            )
+                # --- Overlay BTC box ---
+                btc_top = "BTC"
+                btc_value = "$" + (str(btc_price) if btc_price is not None else "N/A")
+                btc_y = _btc_label_y  # uit dashboard.py global
+                btc_color = hex_to_rgb(btc_coin["color"])
+                _prev_btc_box = draw_text_overlay_box(
+                    btc_top, btc_value, btc_color, textbox_offset, btc_y, prev_box=_prev_btc_box
+                )
 
-            # === OVERLAY KLOK ===
+                # --- Overlay coin box onder BTC ---
+                coin_top = show_coin["symbol"].upper()
+                coin_value = "$" + (str(show_coin_price) if show_coin_price is not None else "N/A")
+                if _prev_btc_box:
+                    coin_y = _prev_btc_box[1] + _prev_btc_box[3] + 20
+                else:
+                    coin_y = _btc_price_y + _btc_price_h + 20
+                _prev_coin_box = draw_text_overlay_box(
+                    coin_top, coin_value, coin_color, textbox_offset, coin_y, prev_box=_prev_coin_box
+                )
+
+            # Overlay klok (zoals altijd)
             if now_str != last_clock_str or redraw_full:
                 update_clock_area(btc_color)
                 last_clock_str = now_str
