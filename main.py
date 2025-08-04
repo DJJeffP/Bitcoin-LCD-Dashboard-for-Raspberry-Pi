@@ -4,7 +4,7 @@ import sys
 import termios
 import tty
 from calibration import load_calibration
-from dashboard import draw_dashboard, update_clock_area, draw_text_overlay_box, textbox_offset
+from dashboard import draw_dashboard, update_clock_area, update_coin_value_area_variable, textbox_offset
 from setup_screen import setup_touch_listener
 from touchscreen import double_tap_detector
 from price import price_updater, get_cached_price
@@ -54,10 +54,8 @@ def main():
     last_rot_time = time.time()
     coin_index = 0
     last_clock_str = ""
-    _prev_btc_box = None
-    _prev_coin_box = None
 
-    # Direct na start: eerste draw
+    # Eerste draw
     btc_price = get_cached_price(btc_coin)
     show_coin = coins[coin_index]
     show_coin_price = get_cached_price(show_coin)
@@ -81,40 +79,9 @@ def main():
                 last_rot_time = now
                 draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
                 last_clock_str = ""
-                _prev_btc_box = None
-                _prev_coin_box = None
 
-            # Fallbacks als globale vars nog niet bestaan
-            global _btc_label_y, _btc_price_y, _btc_price_h
-            if '_btc_label_y' not in globals():
-                _btc_label_y = int(HEIGHT * 0.35) - 36
-            if '_btc_price_y' not in globals():
-                _btc_price_y = int(HEIGHT * 0.35) - 36 + 36 + 5
-            if '_btc_price_h' not in globals():
-                _btc_price_h = 48
-
-            btc_top = "BTC"
-            btc_value = "$" + (str(btc_price) if btc_price is not None else "N/A")
-            btc_y = _btc_label_y
-            btc_color = hex_to_rgb(btc_coin["color"])
-
-            # ---- Overlay BTC box ----
-            btc_top = "BTC"
-            btc_value = "$" + (str(btc_price) if btc_price is not None else "N/A")
-            btc_y = _btc_label_y
-            btc_color = hex_to_rgb(btc_coin["color"])
-            _prev_btc_box = draw_text_overlay_box(
-                btc_top, btc_value, btc_color, textbox_offset, btc_y, prev_box=_prev_btc_box
-            )
-
-            # ---- Overlay coin box onder BTC ----
-            coin_top = show_coin["symbol"].upper()
-            coin_value = "$" + (str(show_coin_price) if show_coin_price is not None else "N/A")
-            coin_color = hex_to_rgb(show_coin["color"])
-            coin_y = _prev_btc_box[1] + _prev_btc_box[3] + 20 if _prev_btc_box else (_btc_price_y + _btc_price_h + 20)
-            _prev_coin_box = draw_text_overlay_box(
-                coin_top, coin_value, coin_color, textbox_offset, coin_y, prev_box=_prev_coin_box
-            )
+            # Overlay coin box als variabele overlay ONDER BTC
+            update_coin_value_area_variable(coin_symbol, show_coin_price, coin_color, textbox_offset)
 
             if now_str != last_clock_str:
                 update_clock_area(btc_color)

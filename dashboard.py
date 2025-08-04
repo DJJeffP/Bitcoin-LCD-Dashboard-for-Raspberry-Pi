@@ -1,10 +1,3 @@
-# dashboard.py
-"""
-Universele dashboard overlay voor Raspberry Pi LCD.
-Professioneel opgebouwd, future-proof en volledig herbruikbaar!
-Geschikt voor dynamische textboxes (BTC, coins, alerts, etc.).
-"""
-
 import os
 import time
 from PIL import Image, ImageDraw, ImageFont
@@ -13,17 +6,13 @@ WIDTH, HEIGHT = 480, 320
 FRAMEBUFFER = "/dev/fb1"
 BG_FOLDER = "backgrounds"
 BG_FALLBACK = os.path.join(BG_FOLDER, "btc-bg.png")
-
-# Universele offset voor textboxes (vanuit het midden naar rechts)
 textbox_offset = 60
 
-# Klok rechtsboven
 CLOCK_X = 270
 CLOCK_Y = 10
 CLOCK_W = 200
 CLOCK_H = 55
 
-# Fonts
 FONT_BIG = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 FONT_SMALL = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 font_main = ImageFont.truetype(FONT_BIG, 36)
@@ -39,10 +28,6 @@ def hex_to_rgb(hex_color, fallback=(247,147,26)):
         return fallback
 
 def draw_dashboard(btc_price, btc_color, coin, coin_price):
-    """
-    Tekent statische achtergrond + BTC (naam en prijs).
-    Overlay boxes (BTC/coins) en klok worden apart ge-overlayed!
-    """
     coin_id = coin["id"]
     coin_bg = os.path.join(BG_FOLDER, f"{coin_id}-bg.png")
     if not os.path.isfile(coin_bg):
@@ -55,7 +40,6 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
     right_offset = textbox_offset
     btc_color_rgb = btc_color
 
-    # Bepaal BTC label/prijs coordinaten voor overlays
     label_bbox = draw.textbbox((0, 0), label, font=font_main)
     label_w = label_bbox[2] - label_bbox[0]
     label_h = label_bbox[3] - label_bbox[1]
@@ -65,13 +49,12 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
     btc_label_y = int(HEIGHT * 0.35) - label_h
     btc_price_y = btc_label_y + label_h + 5
 
-    # Zet deze in global vars voor overlays
     global _btc_label_y, _btc_price_y, _btc_price_h
     _btc_label_y = btc_label_y
     _btc_price_y = btc_price_y
     _btc_price_h = price_h
 
-    # Alleen ter referentie in de bg
+    # BTC-label en prijs worden direct op de achtergrond getekend!
     draw.text(((WIDTH - label_w)//2 + right_offset, btc_label_y), label, font=font_main, fill=btc_color_rgb)
     draw.text(((WIDTH - price_w)//2 + right_offset, btc_price_y), price_text, font=font_value, fill=(255,255,255))
 
@@ -91,9 +74,6 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
         f.write(rgb565)
 
 def update_clock_area(btc_color=(247,147,26)):
-    """
-    Overlay klok rechtsboven, oranje datum.
-    """
     global _full_bg_cache
     if '_full_bg_cache' not in globals():
         return
@@ -129,48 +109,28 @@ def update_clock_area(btc_color=(247,147,26)):
             end = start + CLOCK_W * 2
             f.write(rgb565[start:end])
 
-def draw_text_overlay_box(
-    top_text, bottom_text,
-    top_color, offset_x, y_pos,
-    prev_box=None, bg_img=None
-):
-    """
-    Universele overlay-box met top- en bottom-tekst.
-    Breedte en hoogte altijd afgestemd op breedste regel + ruime marge.
-    Overschrijft altijd de union van vorige en huidige box (anti-ghosting).
-    Returnt nieuwe box-coords (x, y, w, h) voor volgende call.
-    """
-    if bg_img is None:
-        global _full_bg_cache
-        if '_full_bg_cache' not in globals():
-            return None
-        bg_img = _full_bg_cache
+def update_coin_value_area_variable(coin_symbol, coin_value, coin_color=(255,255,255), right_offset=60):
+    global _full_bg_cache, _btc_price_y, _btc_price_h
+    if '_full_bg_cache' not in globals():
+        return
+    if '_btc_price_y' not in globals() or '_btc_price_h' not in globals():
+        _btc_price_y = int(HEIGHT * 0.35) + 5
+        _btc_price_h = 48
 
-    # Tekst afmetingen
-    symbol_bbox = font_main.getbbox(top_text)
+    symbol_text = coin_symbol.upper()
+    value_text = "$" + (str(coin_value) if coin_value is not None else "N/A")
+
+    symbol_bbox = font_main.getbbox(symbol_text)
     symbol_w = symbol_bbox[2] - symbol_bbox[0]
     symbol_h = symbol_bbox[3] - symbol_bbox[1]
-    value_bbox = font_value.getbbox(bottom_text)
+    value_bbox = font_value.getbbox(value_text)
     value_w = value_bbox[2] - value_bbox[0]
     value_h = value_bbox[3] - value_bbox[1]
 
-    # Bepaal box-grootte met marge
-    box_w = max(symbol_w, value_w) + 40  # 20px marge links/rechts
-    box_h = symbol_h + value_h + 25      # marge boven/onder
-    box_x = (WIDTH - box_w)//2 + offset_x
-    box_y = y_pos
-
-    # Union met vorige box (anti-ghosting)
-    if prev_box:
-        prev_x, prev_y, prev_w, prev_h = prev_box
-        min_x = min(box_x, prev_x)
-        min_y = min(box_y, prev_y)
-        max_x = max(box_x + box_w, prev_x + prev_w)
-        max_y = max(box_y + box_h, prev_y + prev_h)
-        box_x, box_y = min_x, min_y
-        box_w, box_h = max_x - min_x, max_y - min_y
-
-    # Niet buiten het scherm
+    box_w = max(symbol_w, value_w) + 40
+    box_h = symbol_h + value_h + 25
+    box_x = (WIDTH - box_w)//2 + right_offset
+    box_y = _btc_price_y + _btc_price_h + 20
     if box_y + box_h > HEIGHT:
         box_y = HEIGHT - box_h - 10
     if box_x < 0:
@@ -178,18 +138,16 @@ def draw_text_overlay_box(
     if box_x + box_w > WIDTH:
         box_x = WIDTH - box_w
 
-    # Knip uit achtergrond
-    img = bg_img.crop((box_x, box_y, box_x + box_w, box_y + box_h))
+    img = _full_bg_cache.crop((box_x, box_y, box_x + box_w, box_y + box_h))
     draw = ImageDraw.Draw(img)
 
-    # Herbereken posities in de grotere box
     symbol_x = (box_w - symbol_w)//2
     symbol_y = 7
     value_x = (box_w - value_w)//2
     value_y = symbol_y + symbol_h + 8
 
-    draw.text((symbol_x, symbol_y), top_text, font=font_main, fill=top_color)
-    draw.text((value_x, value_y), bottom_text, font=font_value, fill=(255,255,255))
+    draw.text((symbol_x, symbol_y), symbol_text, font=font_main, fill=coin_color)
+    draw.text((value_x, value_y), value_text, font=font_value, fill=(255,255,255))
 
     img_rot = img.rotate(180)
     rgb565 = bytearray()
@@ -211,5 +169,3 @@ def draw_text_overlay_box(
             start = row * box_w * 2
             end = start + box_w * 2
             f.write(rgb565[start:end])
-
-    return (box_x, box_y, box_w, box_h)  # voor volgende call!
