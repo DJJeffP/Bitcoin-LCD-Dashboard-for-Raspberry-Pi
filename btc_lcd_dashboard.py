@@ -6,12 +6,13 @@ import requests
 import evdev
 from PIL import Image, ImageDraw, ImageFont
 
+DEBUG = False  # Set to True for crosshair and debug output
+
 # ==== LCD / Touch Config ====
 FRAMEBUFFER = "/dev/fb1"
 WIDTH, HEIGHT = 480, 320
 TOUCH_DEVICE = '/dev/input/event0'
 CALIBRATION_FILE = "touch_calibration.json"
-DEBUG = False  # Set to True for debug prints/crosshair
 
 # ==== Fonts ====
 FONT_BIG = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -22,22 +23,21 @@ font_time = ImageFont.truetype(FONT_BIG, 28)
 font_date = ImageFont.truetype(FONT_SMALL, 20)
 
 # ==== UI MODE ====
-ui_mode = {'dashboard': True}  # Shared between threads
+ui_mode = {'dashboard': True}
 
 def clear_framebuffer():
     with open(FRAMEBUFFER, 'wb') as f:
         f.write(bytearray([0x00, 0x00] * WIDTH * HEIGHT))
 
 # ==== Touchscreen Calibration ====
-def draw_debug_crosshair(x, y, msg=""):
+def draw_crosshair(x, y, msg=""):
     image = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
     draw = ImageDraw.Draw(image)
-    size = 18
+    size = 20
     draw.line([(x-size, y), (x+size, y)], fill=(0,255,0), width=3)
     draw.line([(x, y-size), (x, y+size)], fill=(0,255,0), width=3)
-    if msg:
-        font = ImageFont.truetype(FONT_SMALL, 24)
-        draw.text((10, HEIGHT-35), msg, fill=(255,255,0), font=font)
+    font = ImageFont.truetype(FONT_SMALL, 24)
+    draw.text((WIDTH//2 - 80, HEIGHT-40), msg, fill=(255,255,255), font=font)
     image = image.rotate(180)
     rgb565 = bytearray()
     for pixel in image.getdata():
@@ -50,15 +50,15 @@ def draw_debug_crosshair(x, y, msg=""):
     with open(FRAMEBUFFER, 'wb') as f:
         f.write(rgb565)
 
-def draw_crosshair(x, y, msg=""):
+def draw_debug_crosshair(x, y, msg=""):
     image = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
     draw = ImageDraw.Draw(image)
-    size = 20
+    size = 18
     draw.line([(x-size, y), (x+size, y)], fill=(0,255,0), width=3)
     draw.line([(x, y-size), (x, y+size)], fill=(0,255,0), width=3)
-    font = ImageFont.truetype(FONT_SMALL, 24)
-    draw.text((WIDTH//2 - 80, HEIGHT-40), msg, fill=(255,255,255), font=font)
-    # Rotate for LCD!
+    if msg:
+        font = ImageFont.truetype(FONT_SMALL, 24)
+        draw.text((10, HEIGHT-35), msg, fill=(255,255,0), font=font)
     image = image.rotate(180)
     rgb565 = bytearray()
     for pixel in image.getdata():
@@ -115,7 +115,6 @@ def calibrate_touch():
     print("[CALIBRATION] Calibration complete and saved.")
     time.sleep(1)
 
-
 def load_calibration():
     if not os.path.isfile(CALIBRATION_FILE):
         print("[INFO] No calibration file found, running calibration...")
@@ -128,29 +127,19 @@ def scale_touch(x, y):
     global calib
     if calib is None:
         calib = load_calibration()
-    # Unpack
+    # Use top-left and bottom-right for X/Y axis mapping
     screen_points = calib["screen_points"]
     raw_points = calib["raw_points"]
-
-    # We'll use top-left (idx 0) and bottom-right (idx 2)
     (sx0, sy0), (sx1, sy1) = screen_points[0], screen_points[2]
     (rx0, ry0), (rx1, ry1) = raw_points[0], raw_points[2]
-
-    # x axis: map raw y to screen x (due to 90deg rotation)
-    # y axis: map raw x to screen y (due to 90deg rotation)
-    # And flip if needed (if calibration shows min > max)
+    # X axis: map raw y to screen x, Y axis: map raw x to screen y (after rotation)
     if rx1 == rx0: rx1 += 1
     if ry1 == ry0: ry1 += 1
-    if sx1 == sx0: sx1 += 1
-    if sy1 == sy0: sy1 += 1
-
     pixel_x = int((y - ry0) * (sx1 - sx0) / (ry1 - ry0) + sx0)
     pixel_y = int((x - rx0) * (sy1 - sy0) / (rx1 - rx0) + sy0)
-
     pixel_x = max(0, min(WIDTH-1, pixel_x))
     pixel_y = max(0, min(HEIGHT-1, pixel_y))
     return pixel_x, pixel_y
-
 
 def is_in_clock_area(x, y):
     return x >= 428
@@ -160,7 +149,7 @@ CONFIG_FILE = "coins.json"
 BG_FOLDER = "backgrounds"
 BG_FALLBACK = os.path.join(BG_FOLDER, "btc-bg.png")
 ROTATE_SECS = 20
-PRICE_UPDATE_SECS = 60  # Cache verversen
+PRICE_UPDATE_SECS = 60
 
 def load_coins(config_file=CONFIG_FILE):
     with open(config_file, "r") as f:
@@ -186,7 +175,8 @@ def price_updater(coins):
                 if price is not None:
                     with price_cache_lock:
                         price_cache[coingecko_id] = float(price)
-                    print(f"[INFO] Updated {coin['symbol']} price: {price}")
+                    if DEBUG:
+                        print(f"[INFO] Updated {coin['symbol']} price: {price}")
                 else:
                     try:
                         url_single = f"https://api.coingecko.com/api/v3/simple/price?ids={coingecko_id}&vs_currencies=usd"
@@ -195,7 +185,8 @@ def price_updater(coins):
                         if single_price is not None:
                             with price_cache_lock:
                                 price_cache[coingecko_id] = float(single_price)
-                            print(f"[FALLBACK] Updated {coin['symbol']} price (single): {single_price}")
+                            if DEBUG:
+                                print(f"[FALLBACK] Updated {coin['symbol']} price (single): {single_price}")
                         else:
                             binance_symbol = coin.get("binance_symbol")
                             if binance_symbol:
@@ -206,7 +197,8 @@ def price_updater(coins):
                                     if price_bin > 0:
                                         with price_cache_lock:
                                             price_cache[coingecko_id] = price_bin
-                                        print(f"[BINANCE] Updated {coin['symbol']} price: {price_bin}")
+                                        if DEBUG:
+                                            print(f"[BINANCE] Updated {coin['symbol']} price: {price_bin}")
                                     else:
                                         print(f"[WARNING] {coin['symbol']} not found at Binance ({binance_symbol}): {r_bin.text}")
                                 else:
@@ -274,8 +266,6 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
 
     # ---- Rotatie voor LCD ----
     image = image.rotate(180)
-
-    # ---- RGB565 little endian ----
     rgb565 = bytearray()
     for pixel in image.getdata():
         r = pixel[0] >> 3
@@ -299,17 +289,14 @@ def draw_coin_toggle_list(coins, scroll=0, search_text="", search_focused=False)
     draw = ImageDraw.Draw(image)
     font = ImageFont.truetype(FONT_SMALL, 26)
     font_search = ImageFont.truetype(FONT_SMALL, 24)
-    
     # Title
     draw.rectangle([0, 0, WIDTH, 55], fill=(50,50,90))
     draw.text((20, 10), "SETUP: Toggle/Search", fill=(255,255,255), font=font)
-    
     # Search bar
     draw.rectangle([20, 55, WIDTH-20, 95], fill=(60,60,100))
     draw.text((30, 65), f"Search: {search_text}", fill=(255,255,255), font=font_search)
     if search_focused:
         draw.rectangle([18, 53, WIDTH-18, 97], outline=(80,255,80), width=2)
-    
     # Coin list (max 6 on screen, scrolling)
     for i, coin in enumerate(visible):
         y = 105 + i*40
@@ -318,50 +305,42 @@ def draw_coin_toggle_list(coins, scroll=0, search_text="", search_focused=False)
         draw.rectangle(toggle_box, fill=fill)
         text = f"{coin['symbol']} - {coin['name']}"
         draw.text((80, y), text, fill=(255,255,255), font=font)
-
-    # Up scroll arrow (top right, above coin list)
+    # Scroll arrows
     scroll_up_x = WIDTH - 60
     scroll_up_y = 105
-    draw.polygon([(scroll_up_x, scroll_up_y), (scroll_up_x+30, scroll_up_y), (scroll_up_x+15, scroll_up_y-20)], fill=(255,255,255))
-    # Down scroll arrow (bottom right, below coin list)
     scroll_down_x = WIDTH - 60
     scroll_down_y = 105 + 6*40
+    draw.polygon([(scroll_up_x, scroll_up_y), (scroll_up_x+30, scroll_up_y), (scroll_up_x+15, scroll_up_y-20)], fill=(255,255,255))
     draw.polygon([(scroll_down_x, scroll_down_y), (scroll_down_x+30, scroll_down_y), (scroll_down_x+15, scroll_down_y+20)], fill=(255,255,255))
-
-    # Save button at bottom right
+    # SAVE button (always at bottom right)
     save_left = WIDTH - 180
     save_right = WIDTH - 50
     save_top = HEIGHT - 70
     save_bottom = HEIGHT - 20
     draw.rectangle([save_left, save_top, save_right, save_bottom], fill=(60,130,60))
     draw.text((save_left+15, save_top+12), "SAVE", fill=(255,255,255), font=font_search)
-    # Keyboard only if search bar focused
+    # Keyboard above SAVE button
+    keys = [
+        "QWERTYUIOP",
+        "ASDFGHJKL",
+        "ZXCVBNM<-"
+    ]
+    key_w = 38
+    key_h = 38
+    key_rows = 3
+    key_gap = 4
+    keyboard_height = key_rows * key_h + (key_rows - 1) * key_gap
+    save_button_top = HEIGHT - 70
+    key_start_y = save_button_top - keyboard_height - 10  # 10px margin above SAVE
+    total_key_row_width = 10 * key_w + 9 * key_gap
+    key_start_x = (WIDTH - total_key_row_width) // 2
     if search_focused:
-        keys = [
-            "QWERTYUIOP",
-            "ASDFGHJKL",
-            "ZXCVBNM<-"
-        ]
-        key_w = 38
-        total_key_row_width = 10 * key_w + 9 * 4  # 10 keys, 9 spaces, per row
-        key_start_x = (WIDTH - total_key_row_width) // 2
-        key_h = 38
-        key_start_y = HEIGHT-160
         for row_idx, row in enumerate(keys):
-            yk = key_start_y + row_idx * (key_h + 4)
+            yk = key_start_y + row_idx * (key_h + key_gap)
             for col_idx, char in enumerate(row):
-                xk = key_start_x + col_idx * (key_w + 4)
+                xk = key_start_x + col_idx * (key_w + key_gap)
                 draw.rectangle([xk, yk, xk+key_w, yk+key_h], fill=(80,80,80))
                 draw.text((xk+10, yk+8), char, font=font_search, fill=(255,255,255))
-
-    
-    # Scroll buttons
-    if scroll > 0:
-        draw.polygon([(WIDTH-60,110), (WIDTH-30,110), (WIDTH-45,90)], fill=(255,255,255))
-    if scroll+6 < len(matches):
-        draw.polygon([(WIDTH-60,340), (WIDTH-30,340), (WIDTH-45,360)], fill=(255,255,255))
-    
-    # Rotate for LCD
     image = image.rotate(180)
     rgb565 = bytearray()
     for pixel in image.getdata():
@@ -373,10 +352,10 @@ def draw_coin_toggle_list(coins, scroll=0, search_text="", search_focused=False)
         rgb565.append((value >> 8) & 0xFF)
     with open(FRAMEBUFFER, 'wb') as f:
         f.write(rgb565)
-    return matches, font
+    return matches, font, keys, key_start_x, key_start_y, key_w, key_h, key_gap
 
-def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches, font):
-    # 1. SAVE button is always on top!
+def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches, font, keys, key_start_x, key_start_y, key_w, key_h, key_gap):
+    # SAVE button always on top
     save_left = WIDTH - 180
     save_right = WIDTH - 50
     save_top = HEIGHT - 70
@@ -389,7 +368,7 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
         switch_to_dashboard()
         return True, scroll, search_text, False
 
-    # 2. Scroll up button (top right, above coin list)
+    # Scroll up button
     scroll_up_x = WIDTH - 60
     scroll_up_y = 105
     if scroll_up_x <= x <= scroll_up_x+30 and scroll_up_y-20 <= y <= scroll_up_y+10 and scroll > 0:
@@ -397,7 +376,7 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
             print("[DEBUG] Scroll UP touched")
         return False, scroll-1, search_text, search_focused
 
-    # 3. Scroll down button (bottom right, below coin list)
+    # Scroll down button
     scroll_down_x = WIDTH - 60
     scroll_down_y = 105 + 6*40
     if scroll_down_x <= x <= scroll_down_x+30 and scroll_down_y <= y <= scroll_down_y+20 and (scroll+6) < len(matches):
@@ -405,28 +384,18 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
             print("[DEBUG] Scroll DOWN touched")
         return False, scroll+1, search_text, search_focused
 
-    # 4. Search bar focus
+    # Search bar focus
     if 20 <= x <= WIDTH-20 and 55 <= y <= 95:
         if DEBUG:
             print("[DEBUG] Search bar focused")
         return False, scroll, search_text, True
 
-    # 5. Keyboard keys (only if search focused)
-    keys = [
-        "QWERTYUIOP",
-        "ASDFGHJKL",
-        "ZXCVBNM<-"
-    ]
-    key_w = 38
-    key_h = 38
-    key_start_y = HEIGHT - 160
-    total_key_row_width = 10 * key_w + 9 * 4  # 10 keys, 9 gaps
-    key_start_x = (WIDTH - total_key_row_width) // 2
+    # Keyboard (aligned with visual keys)
     if search_focused:
         for row_idx, row in enumerate(keys):
-            yk = key_start_y + row_idx * (key_h + 4)
+            yk = key_start_y + row_idx * (key_h + key_gap)
             for col_idx, char in enumerate(row):
-                xk = key_start_x + col_idx * (key_w + 4)
+                xk = key_start_x + col_idx * (key_w + key_gap)
                 if xk <= x <= xk+key_w and yk <= y <= yk+key_h:
                     if DEBUG:
                         print(f"[DEBUG] Key '{char}' pressed")
@@ -436,7 +405,7 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
                         search_text += char
                     return False, scroll, search_text, True
 
-    # 6. Coin toggles (hitbox is name text or box, not row)
+    # Coin toggles (hitbox is name text or box)
     for i in range(6):
         y_coin = 105 + i*40
         if i < len(matches):
@@ -448,7 +417,7 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
             x_name_end = x_name_start + text_w
             toggle_box_x1 = 30
             toggle_box_x2 = 70
-            # If touch is on toggle box OR on coin text (plus margin)
+            # Touch on box OR text
             if ((toggle_box_x1 <= x <= toggle_box_x2) or
                 (x_name_start - 8 <= x <= x_name_end + 8)) and y_coin <= y <= y_coin+30:
                 orig_idx = coins.index(coin)
@@ -457,7 +426,7 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
                     print(f"[DEBUG] Toggled {coin['symbol']}, now show={coins[orig_idx]['show']}")
                 return False, scroll, search_text, False
 
-    # 7. Click anywhere else: remove focus from search
+    # Else: remove search focus
     return False, scroll, search_text, False
 
 def setup_touch_listener(coins):
@@ -468,7 +437,8 @@ def setup_touch_listener(coins):
     search_text = ""
     search_focused = False
     while not ui_mode['dashboard']:
-        matches, font = draw_coin_toggle_list(coins, scroll=scroll, search_text=search_text, search_focused=search_focused)
+        matches, font, keys, key_start_x, key_start_y, key_w, key_h, key_gap = draw_coin_toggle_list(
+            coins, scroll=scroll, search_text=search_text, search_focused=search_focused)
         for event in device.read_loop():
             if ui_mode['dashboard']:
                 return
@@ -487,7 +457,8 @@ def setup_touch_listener(coins):
                         draw_debug_crosshair(x, y, f"({x}, {y})")
                         print(f"[DEBUG][SETUP] Touch at x={x}, y={y} (on finger UP)")
                     should_exit, scroll, search_text, search_focused = handle_setup_touch(
-                        x, y, coins, scroll, search_text, search_focused, matches, font)
+                        x, y, coins, scroll, search_text, search_focused,
+                        matches, font, keys, key_start_x, key_start_y, key_w, key_h, key_gap)
                     if should_exit:
                         return
                     break  # redraw after every tap
@@ -505,7 +476,7 @@ def switch_to_dashboard():
 def double_tap_detector(trigger_callback):
     device = evdev.InputDevice(TOUCH_DEVICE)
     last_tap_time = 0
-    DOUBLE_TAP_MAX_INTERVAL = 0.4  # seconds
+    DOUBLE_TAP_MAX_INTERVAL = 0.4
     raw_x, raw_y = 0, 0
     for event in device.read_loop():
         if event.type == evdev.ecodes.EV_ABS:
@@ -529,9 +500,7 @@ def double_tap_detector(trigger_callback):
 def main():
     # ---- Touch Calibration (runs before anything else) ----
     global calib
-    calib = load_calibration()  # This will block and calibrate if not done yet
-
-    # ---- Only now do the rest of your setup ----
+    calib = load_calibration()
     clear_framebuffer()
     coins = load_coins()
     btc_coin = next(c for c in coins if c["id"] == "btc")
@@ -558,11 +527,10 @@ def main():
             btc_price = get_cached_price(btc_coin)
             show_coin_price = get_cached_price(show_coin) if show_coin["id"] != "btc" else None
             draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
-            time.sleep(0.95)  # Tight 1-second update
+            time.sleep(0.95)
         else:
-            # Setup/Search mode
             setup_touch_listener(coins)
-            time.sleep(0.1)  # Small sleep to avoid tight loop
+            time.sleep(0.1)
 
 if __name__ == "__main__":
     try:
