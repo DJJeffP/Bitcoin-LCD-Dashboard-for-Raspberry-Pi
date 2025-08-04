@@ -84,6 +84,20 @@ def main():
                 _prev_btc_box = None
                 _prev_coin_box = None
 
+            # Fallbacks als globale vars nog niet bestaan
+            global _btc_label_y, _btc_price_y, _btc_price_h
+            if '_btc_label_y' not in globals():
+                _btc_label_y = int(HEIGHT * 0.35) - 36
+            if '_btc_price_y' not in globals():
+                _btc_price_y = int(HEIGHT * 0.35) - 36 + 36 + 5
+            if '_btc_price_h' not in globals():
+                _btc_price_h = 48
+
+            btc_top = "BTC"
+            btc_value = "$" + (str(btc_price) if btc_price is not None else "N/A")
+            btc_y = _btc_label_y
+            btc_color = hex_to_rgb(btc_coin["color"])
+
             # ---- Overlay BTC box ----
             btc_top = "BTC"
             btc_value = "$" + (str(btc_price) if btc_price is not None else "N/A")
