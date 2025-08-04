@@ -10,6 +10,7 @@ from touchscreen import double_tap_detector
 from price import price_updater, get_cached_price
 from utils import clear_framebuffer, hex_to_rgb
 import json
+DEBUG = True
 
 ui_mode = {'dashboard': True}
 
