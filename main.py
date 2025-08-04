@@ -57,7 +57,7 @@ def main():
     _prev_btc_box = None
     _prev_coin_box = None
 
-    # Opstart: altijd full redraw
+    # Direct na start: eerste draw
     btc_price = get_cached_price(btc_coin)
     show_coin = coins[coin_index]
     show_coin_price = get_cached_price(show_coin)
@@ -75,7 +75,7 @@ def main():
             coin_symbol = show_coin["symbol"]
             coin_color = hex_to_rgb(show_coin["color"])
 
-            # Detect coin switch for rotation
+            # Coin rotatie
             if now - last_rot_time >= 20:
                 coin_index = (coin_index + 1) % len(coins)
                 last_rot_time = now
@@ -84,7 +84,7 @@ def main():
                 _prev_btc_box = None
                 _prev_coin_box = None
 
-            # --- Overlay BTC box ---
+            # ---- Overlay BTC box ----
             btc_top = "BTC"
             btc_value = "$" + (str(btc_price) if btc_price is not None else "N/A")
             btc_y = _btc_label_y
@@ -93,7 +93,7 @@ def main():
                 btc_top, btc_value, btc_color, textbox_offset, btc_y, prev_box=_prev_btc_box
             )
 
-            # --- Overlay coin box onder BTC ---
+            # ---- Overlay coin box onder BTC ----
             coin_top = show_coin["symbol"].upper()
             coin_value = "$" + (str(show_coin_price) if show_coin_price is not None else "N/A")
             coin_color = hex_to_rgb(show_coin["color"])
