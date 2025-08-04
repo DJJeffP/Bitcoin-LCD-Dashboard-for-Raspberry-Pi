@@ -54,9 +54,14 @@ def main():
     last_rot_time = time.time()
     coin_index = 0
     last_clock_str = ""
+    _prev_btc_box = None
+    _prev_coin_box = None
 
     # Opstart: altijd full redraw
-    draw_dashboard(get_cached_price(btc_coin), btc_color, coins[coin_index], get_cached_price(coins[coin_index]))
+    btc_price = get_cached_price(btc_coin)
+    show_coin = coins[coin_index]
+    show_coin_price = get_cached_price(show_coin)
+    draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
 
     while True:
         if ui_mode['dashboard']:
@@ -76,20 +81,26 @@ def main():
                 last_rot_time = now
                 draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
                 last_clock_str = ""
+                _prev_btc_box = None
+                _prev_coin_box = None
 
             # --- Overlay BTC box ---
             btc_top = "BTC"
             btc_value = "$" + (str(btc_price) if btc_price is not None else "N/A")
             btc_y = _btc_label_y
             btc_color = hex_to_rgb(btc_coin["color"])
-            draw_text_overlay_box(btc_top, btc_value, btc_color, textbox_offset, btc_y)
+            _prev_btc_box = draw_text_overlay_box(
+                btc_top, btc_value, btc_color, textbox_offset, btc_y, prev_box=_prev_btc_box
+            )
 
             # --- Overlay coin box onder BTC ---
             coin_top = show_coin["symbol"].upper()
             coin_value = "$" + (str(show_coin_price) if show_coin_price is not None else "N/A")
             coin_color = hex_to_rgb(show_coin["color"])
-            coin_y = _btc_price_y + _btc_price_h + 20
-            draw_text_overlay_box(coin_top, coin_value, coin_color, textbox_offset, coin_y)
+            coin_y = _prev_btc_box[1] + _prev_btc_box[3] + 20 if _prev_btc_box else (_btc_price_y + _btc_price_h + 20)
+            _prev_coin_box = draw_text_overlay_box(
+                coin_top, coin_value, coin_color, textbox_offset, coin_y, prev_box=_prev_coin_box
+            )
 
             if now_str != last_clock_str:
                 update_clock_area(btc_color)
