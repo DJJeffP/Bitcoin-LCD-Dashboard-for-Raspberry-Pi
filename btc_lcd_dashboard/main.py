@@ -4,7 +4,7 @@ import sys
 import termios
 import tty
 from calibration import load_calibration
-from dashboard import draw_dashboard, update_clock_area, update_coin_value_area_aligned
+from dashboard import draw_dashboard, update_clock_area, update_coin_value_area_variable
 from setup_screen import setup_touch_listener
 from touchscreen import double_tap_detector
 from price import price_updater, get_cached_price
@@ -85,7 +85,7 @@ def main():
 
             # Overlay coin value box elke keer als coin verandert of waarde wijzigt:
             if coin_symbol != last_coin_symbol or coin_val_str != last_coin_val_str or redraw_full:
-                update_coin_value_area_aligned(coin_symbol, show_coin_price, coin_color)
+                update_coin_value_area_variable(coin_symbol, show_coin_price, coin_color)
                 last_coin_symbol = coin_symbol
                 last_coin_val_str = coin_val_str
 
