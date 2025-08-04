@@ -1,22 +1,28 @@
-# main.py
-"""
-Startpunt van het BTC LCD Dashboard.
-Regelt de hoofdloop, mode switching en aanroepen van alle modules.
-"""
-
 import threading
 import time
+import sys
+import termios
+import tty
 from calibration import load_calibration
 from dashboard import draw_dashboard, update_clock_area, update_coin_value_area
 from setup_screen import setup_touch_listener
 from touchscreen import double_tap_detector
 from price import price_updater, get_cached_price
 from utils import clear_framebuffer, hex_to_rgb
-
 import json
 
 # UI-modus (shared state)
 ui_mode = {'dashboard': True}
+
+def wait_for_keypress():
+    print("\nPress any key to exit...")
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 def switch_to_setup():
     if not ui_mode['dashboard']:
@@ -101,5 +107,6 @@ if __name__ == "__main__":
         import traceback
         print("Error:", e)
         traceback.print_exc()
+        wait_for_keypress()
         clear_framebuffer()
         time.sleep(1)
