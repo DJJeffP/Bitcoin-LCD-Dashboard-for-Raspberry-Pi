@@ -132,3 +132,37 @@ def update_clock_area():
             start = row * CLOCK_W * 2
             end = start + CLOCK_W * 2
             f.write(rgb565[start:end])
+
+def update_coin_value_area(value_str, coin_color=(255,255,255)):
+    """
+    Snijdt coin value gebied uit cached achtergrond, tekent de prijs erop,
+    en schrijft alleen dat kleine deel naar framebuffer.
+    """
+    global _full_bg_cache
+    if '_full_bg_cache' not in globals():
+        return  # Geen achtergrond beschikbaar
+
+    img = _full_bg_cache.crop((COIN_X, COIN_Y, COIN_X + COIN_W, COIN_Y + COIN_H))
+    draw = ImageDraw.Draw(img)
+
+    w, h = draw.textbbox((0, 0), value_str, font=font_value)[2:]
+    # Tekst centreren in het coin value gebied
+    draw.text(((COIN_W - w)//2, (COIN_H - h)//2), value_str, font=font_value, fill=coin_color)
+
+    img = img.rotate(180)
+    rgb565 = bytearray()
+    for pixel in img.getdata():
+        r = pixel[0] >> 3
+        g = pixel[1] >> 2
+        b = pixel[2] >> 3
+        val = (r << 11) | (g << 5) | b
+        rgb565.append(val & 0xFF)
+        rgb565.append((val >> 8) & 0xFF)
+
+    fb_offset = (COIN_Y * WIDTH + COIN_X) * 2
+    with open(FRAMEBUFFER, "r+b") as f:
+        for row in range(COIN_H):
+            f.seek(fb_offset + row * WIDTH * 2)
+            start = row * COIN_W * 2
+            end = start + COIN_W * 2
+            f.write(rgb565[start:end])
