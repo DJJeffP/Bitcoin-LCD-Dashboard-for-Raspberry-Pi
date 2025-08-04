@@ -134,14 +134,14 @@ def scale_touch(x, y):
     raw_min_y = calib["raw_min_y"]
     raw_max_y = calib["raw_max_y"]
     # SWAP axes for 90-degree rotation!
-pixel_x = int((y - raw_min_y) * WIDTH / (raw_max_y - raw_min_y))
-pixel_y = int((x - raw_min_x) * HEIGHT / (raw_max_x - raw_min_x))
+    pixel_x = int((y - raw_min_y) * WIDTH / (raw_max_y - raw_min_y))
+    pixel_y = int((x - raw_min_x) * HEIGHT / (raw_max_x - raw_min_x))
 
-# Flip the Y axis (mirror vertically)
-pixel_y = HEIGHT - pixel_y - 1
+    # Flip the Y axis (mirror vertically)
+    pixel_y = HEIGHT - pixel_y - 1
 
-pixel_x = max(0, min(WIDTH-1, pixel_x))
-pixel_y = max(0, min(HEIGHT-1, pixel_y))
+    pixel_x = max(0, min(WIDTH-1, pixel_x))
+    pixel_y = max(0, min(HEIGHT-1, pixel_y))
 
     return pixel_x, pixel_y
 
