@@ -45,20 +45,25 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
     full_bg = Image.open(coin_bg).convert("RGB").resize((WIDTH, HEIGHT))
     draw = ImageDraw.Draw(full_bg)
 
-    # BTC label en prijs (midden, zoals origineel)
     label = "BTC"
     price_text = "$" + (str(btc_price) if btc_price is not None else "N/A")
     right_offset = 60
     btc_color_rgb = btc_color
 
-    # Nieuwe manier om exacte y/hoogte voor overlay te hergebruiken
-    label_w, label_h = draw.textbbox((0, 0), label, font=font_main)[2:]
-    price_w, price_h = draw.textbbox((0, 0), price_text, font=font_value)[2:]
+    # Gebruik textbbox om afmetingen te bepalen (voor de overlay-functie!)
+    label_bbox = draw.textbbox((0, 0), label, font=font_main)
+    label_w = label_bbox[2] - label_bbox[0]
+    label_h = label_bbox[3] - label_bbox[1]
+    price_bbox = draw.textbbox((0, 0), price_text, font=font_value)
+    price_w = price_bbox[2] - price_bbox[0]
+    price_h = price_bbox[3] - price_bbox[1]
     btc_label_y = int(HEIGHT * 0.35) - label_h
     btc_price_y = btc_label_y + label_h + 5
 
-    # Sla voor overlays op in globals
-    global _btc_price_y, _btc_price_h
+    # Zet deze in global vars (voor overlay):
+    global _btc_label_w, _btc_label_y, _btc_price_y, _btc_price_h
+    _btc_label_w = label_w
+    _btc_label_y = btc_label_y
     _btc_price_y = btc_price_y
     _btc_price_h = price_h
 
@@ -68,7 +73,6 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
     global _full_bg_cache
     _full_bg_cache = full_bg.copy()
 
-    # Volledig scherm roteren en schrijven
     img_rot = full_bg.rotate(180)
     rgb565 = bytearray()
     for pixel in img_rot.getdata():
@@ -80,6 +84,7 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
         rgb565.append((value >> 8) & 0xFF)
     with open(FRAMEBUFFER, 'wb') as f:
         f.write(rgb565)
+
 
 def update_clock_area(btc_color=(247,147,26)):
     """
@@ -120,41 +125,52 @@ def update_clock_area(btc_color=(247,147,26)):
             end = start + CLOCK_W * 2
             f.write(rgb565[start:end])
 
-def update_coin_value_area_centered(coin_symbol, coin_value, coin_color=(255,255,255)):
+def update_coin_value_area_aligned(coin_symbol, coin_value, coin_color=(255,255,255)):
     """
-    Overlay coin value box gecentreerd onder BTC, altijd zichtbaar!
+    Overlay coin value box, exact horizontaal uitgelijnd met BTC-label en -waarde.
+    Automatische hoogte, geen afkapping meer.
     """
-    global _full_bg_cache, _btc_price_y, _btc_price_h
+    global _full_bg_cache, _btc_label_w, _btc_label_y, _btc_price_y, _btc_price_h
     if '_full_bg_cache' not in globals():
         return
-    if '_btc_price_y' not in globals() or '_btc_price_h' not in globals():
-        # fallback naar vaste plek
-        btc_price_y = 170
-        btc_price_h = 48
-    else:
-        btc_price_y = _btc_price_y
-        btc_price_h = _btc_price_h
+    if not all(k in globals() for k in ['_btc_label_w', '_btc_label_y', '_btc_price_y', '_btc_price_h']):
+        # fallback naar ruwe waardes als globals er niet zijn
+        _btc_label_w = 240
+        _btc_label_y = 80
+        _btc_price_y = 120
+        _btc_price_h = 48
 
-    # Box placement dynamisch onder BTC, altijd midden, hoogte genoeg voor 2 regels
-    BOX_W = 280
-    BOX_H = 80
-    BOX_X = (WIDTH - BOX_W)//2
-    BOX_Y = btc_price_y + btc_price_h + 20
+    # Zelfde breedte/offset als BTC-label
+    BOX_W = _btc_label_w
+    BOX_X = (WIDTH - _btc_label_w)//2 + 60  # 60 = dezelfde right_offset als BTC-label!
 
+    # Dynamische hoogte, altijd genoeg
+    symbol_text = coin_symbol.upper()
+    value_text = "$" + (str(coin_value) if coin_value is not None else "N/A")
+    # Bepaal tekstafmetingen:
+    symbol_bbox = font_main.getbbox(symbol_text)
+    symbol_h = symbol_bbox[3] - symbol_bbox[1]
+    value_bbox = font_value.getbbox(value_text)
+    value_h = value_bbox[3] - value_bbox[1]
+    # Makkelijk marge toevoegen:
+    BOX_H = symbol_h + value_h + 20
+
+    # Y direct onder BTC-prijs
+    BOX_Y = _btc_price_y + _btc_price_h + 20
+    # Corrigeer als onderkant buiten beeld zou vallen:
     if BOX_Y + BOX_H > HEIGHT:
         BOX_Y = HEIGHT - BOX_H - 10
 
+    # Knip achtergrond
     img = _full_bg_cache.crop((BOX_X, BOX_Y, BOX_X + BOX_W, BOX_Y + BOX_H))
     draw = ImageDraw.Draw(img)
 
-    symbol_text = coin_symbol.upper()
-    value_text = "$" + (str(coin_value) if coin_value is not None else "N/A")
-
-    symbol_w, symbol_h = draw.textbbox((0,0), symbol_text, font=font_main)[2:]
+    # Tekst centreren in box:
+    symbol_w = font_main.getlength(symbol_text)
     symbol_x = (BOX_W - symbol_w)//2
     symbol_y = 5
 
-    value_w, value_h = draw.textbbox((0,0), value_text, font=font_value)[2:]
+    value_w = font_value.getlength(value_text)
     value_x = (BOX_W - value_w)//2
     value_y = symbol_y + symbol_h + 5
 
