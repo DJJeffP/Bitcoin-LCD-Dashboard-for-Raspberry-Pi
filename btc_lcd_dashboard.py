@@ -208,20 +208,30 @@ def handle_setup_touch(x, y):
 def setup_touch_listener():
     device = evdev.InputDevice(TOUCH_DEVICE)
     raw_x, raw_y = 0, 0
+    last_abs_x, last_abs_y = 0, 0
+    got_new_coord = False
+
     for event in device.read_loop():
         if ui_mode['dashboard']:
             break  # Exit listener if user left setup mode
+
         if event.type == evdev.ecodes.EV_ABS:
             if event.code == evdev.ecodes.ABS_X:
                 raw_x = event.value
+                got_new_coord = True
             elif event.code == evdev.ecodes.ABS_Y:
                 raw_y = event.value
-        # Only need single tap here!
+                got_new_coord = True
+
         elif event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_TOUCH and event.value == 1:
+            if not got_new_coord:
+                continue  # Skip if no new coordinate since last touch!
             x, y = scale_touch(raw_x, raw_y)
             print(f"[DEBUG][SETUP] Touch at x={x}, y={y}")
-            if handle_setup_touch(x, y):  # If button was hit, exit immediately
+            got_new_coord = False  # Reset for next tap
+            if handle_setup_touch(x, y):
                 break
+
 
 
 # ==== DASHBOARD <--> SETUP MODE SWITCH ====
