@@ -39,12 +39,17 @@ def draw_coin_toggle_list(coins, scroll=0, search_text="", search_focused=False)
     scroll_down_y = 105 + 6*40
     draw.polygon([(scroll_up_x, scroll_up_y), (scroll_up_x+30, scroll_up_y), (scroll_up_x+15, scroll_up_y-20)], fill=(255,255,255))
     draw.polygon([(scroll_down_x, scroll_down_y), (scroll_down_x+30, scroll_down_y), (scroll_down_x+15, scroll_down_y+20)], fill=(255,255,255))
-    save_left = WIDTH - 180
-    save_right = WIDTH - 50
-    save_top = HEIGHT - 70
-    save_bottom = HEIGHT - 20
+    
+    # Save-knop rechtsboven
+    save_w = 110
+    save_h = 40
+    save_left = WIDTH - save_w - 18
+    save_right = WIDTH - 18
+    save_top = 12
+    save_bottom = save_top + save_h
     draw.rectangle([save_left, save_top, save_right, save_bottom], fill=(60,130,60))
-    draw.text((save_left+15, save_top+12), "SAVE", fill=(255,255,255), font=font_search)
+    draw.text((save_left+17, save_top+10), "SAVE", fill=(255,255,255), font=font_search)
+
     keys = [
         "QWERTYUIOP",
         "ASDFGHJKL",
@@ -77,13 +82,11 @@ def draw_coin_toggle_list(coins, scroll=0, search_text="", search_focused=False)
         rgb565.append((value >> 8) & 0xFF)
     with open("/dev/fb1", 'wb') as f:
         f.write(rgb565)
-    return matches, font, keys, key_start_x, key_start_y, key_w, key_h, key_gap
+    # Return save-knop coords ook (voor touch):
+    return matches, font, keys, key_start_x, key_start_y, key_w, key_h, key_gap, (save_left, save_top, save_right, save_bottom)
 
-def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches, font, keys, key_start_x, key_start_y, key_w, key_h, key_gap, switch_to_dashboard):
-    save_left = WIDTH - 180
-    save_right = WIDTH - 50
-    save_top = HEIGHT - 70
-    save_bottom = HEIGHT - 20
+def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches, font, keys, key_start_x, key_start_y, key_w, key_h, key_gap, save_btn_rect, switch_to_dashboard):
+    save_left, save_top, save_right, save_bottom = save_btn_rect
     if save_left <= x <= save_right and save_top <= y <= save_bottom:
         save_settings(coins)
         switch_to_dashboard()
@@ -136,7 +139,7 @@ def setup_touch_listener(coins, switch_to_dashboard):
     search_text = ""
     search_focused = False
     while True:
-        matches, font, keys, key_start_x, key_start_y, key_w, key_h, key_gap = draw_coin_toggle_list(
+        matches, font, keys, key_start_x, key_start_y, key_w, key_h, key_gap, save_btn_rect = draw_coin_toggle_list(
             coins, scroll=scroll, search_text=search_text, search_focused=search_focused)
         for event in device.read_loop():
             if event.type == evdev.ecodes.EV_ABS:
@@ -153,7 +156,7 @@ def setup_touch_listener(coins, switch_to_dashboard):
                     x, y = scale_touch(raw_x, raw_y)
                     should_exit, scroll, search_text, search_focused = handle_setup_touch(
                         x, y, coins, scroll, search_text, search_focused,
-                        matches, font, keys, key_start_x, key_start_y, key_w, key_h, key_gap, switch_to_dashboard)
+                        matches, font, keys, key_start_x, key_start_y, key_w, key_h, key_gap, save_btn_rect, switch_to_dashboard)
                     if should_exit:
                         return
                     break
