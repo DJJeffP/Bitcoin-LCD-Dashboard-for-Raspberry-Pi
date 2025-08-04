@@ -11,7 +11,6 @@ from price import price_updater, get_cached_price
 from utils import clear_framebuffer, hex_to_rgb
 import json
 
-# UI-modus (shared state)
 ui_mode = {'dashboard': True}
 
 def wait_for_keypress():
@@ -55,12 +54,13 @@ def main():
     last_rot_time = time.time()
     coin_index = 0
     last_clock_str = ""
-    last_coin_symbol = ""
-    last_coin_val_str = ""
 
     global _prev_btc_box, _prev_coin_box
     _prev_btc_box = None
     _prev_coin_box = None
+
+    # On first run, always draw dashboard:
+    redraw_full = True
 
     while True:
         if ui_mode['dashboard']:
@@ -73,9 +73,8 @@ def main():
             show_coin_price = get_cached_price(show_coin)
             coin_symbol = show_coin["symbol"]
             coin_color = hex_to_rgb(show_coin["color"])
-            coin_val_str = "$" + (str(show_coin_price) if show_coin_price is not None else "N/A")
 
-            redraw_full = False
+            # Detect coin switch for rotation
             if now - last_rot_time >= 20:
                 coin_index = (coin_index + 1) % len(coins)
                 last_rot_time = now
@@ -83,17 +82,16 @@ def main():
 
             if redraw_full or _prev_btc_box is None or _prev_coin_box is None:
                 draw_dashboard(btc_price, btc_color, show_coin, show_coin_price)
-                last_coin_symbol = ""
-                last_coin_val_str = ""
                 last_clock_str = ""
                 _prev_btc_box = None
                 _prev_coin_box = None
-                # Na redraw: overlays NIET tekenen!
+                redraw_full = False  # zet redraw terug naar False
+                # Geen overlays tekenen deze iteratie
             else:
                 # --- Overlay BTC box ---
                 btc_top = "BTC"
                 btc_value = "$" + (str(btc_price) if btc_price is not None else "N/A")
-                btc_y = _btc_label_y  # uit dashboard.py global
+                btc_y = _btc_label_y
                 btc_color = hex_to_rgb(btc_coin["color"])
                 _prev_btc_box = draw_text_overlay_box(
                     btc_top, btc_value, btc_color, textbox_offset, btc_y, prev_box=_prev_btc_box
@@ -102,16 +100,12 @@ def main():
                 # --- Overlay coin box onder BTC ---
                 coin_top = show_coin["symbol"].upper()
                 coin_value = "$" + (str(show_coin_price) if show_coin_price is not None else "N/A")
-                if _prev_btc_box:
-                    coin_y = _prev_btc_box[1] + _prev_btc_box[3] + 20
-                else:
-                    coin_y = _btc_price_y + _btc_price_h + 20
+                coin_y = _prev_btc_box[1] + _prev_btc_box[3] + 20 if _prev_btc_box else (_btc_price_y + _btc_price_h + 20)
                 _prev_coin_box = draw_text_overlay_box(
                     coin_top, coin_value, coin_color, textbox_offset, coin_y, prev_box=_prev_coin_box
                 )
 
-            # Overlay klok (zoals altijd)
-            if now_str != last_clock_str or redraw_full:
+            if now_str != last_clock_str:
                 update_clock_area(btc_color)
                 last_clock_str = now_str
 
