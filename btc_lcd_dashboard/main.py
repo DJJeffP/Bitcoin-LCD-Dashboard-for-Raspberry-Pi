@@ -96,6 +96,8 @@ def main():
                 _prev_btc_box = draw_text_overlay_box(
                     btc_top, btc_value, btc_color, textbox_offset, btc_y, prev_box=_prev_btc_box
                 )
+                print("[DEBUG] BTC overlay: top:", btc_top, "value:", btc_value, "y:", btc_y)
+                print("[DEBUG] COIN overlay: top:", coin_top, "value:", coin_value, "y:", coin_y, "color:", coin_color)
 
                 # --- Overlay coin box onder BTC ---
                 coin_top = show_coin["symbol"].upper()

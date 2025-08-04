@@ -179,5 +179,7 @@ def draw_text_overlay_box(
             start = row * box_w * 2
             end = start + box_w * 2
             f.write(rgb565[start:end])
+    
+    print("[DRAW OVERLAY]", top_text, bottom_text, "Box:", (box_x, box_y, box_w, box_h))
 
     return (box_x, box_y, box_w, box_h)
