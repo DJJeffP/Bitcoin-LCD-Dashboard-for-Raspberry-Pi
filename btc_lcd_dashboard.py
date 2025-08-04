@@ -198,11 +198,12 @@ def draw_setup_screen():
         f.write(rgb565)
 
 def handle_setup_touch(x, y):
-    # Remember, screen is rotated, but touch is not!
-    # SAVE button: right-bottom corner: WIDTH-160, HEIGHT-70, WIDTH-20, HEIGHT-20
-    if WIDTH-160 <= x <= WIDTH-20 and HEIGHT-70 <= y <= HEIGHT-20:
+    # Button area is based on your measured touch coordinates!
+    if 50 <= x <= 120 and 235 <= y <= 325:
         print("[SETUP] SAVE button touched! Returning to dashboard.")
         switch_to_dashboard()
+        return True  # <--- Return True if SAVE was touched
+    return False
 
 def setup_touch_listener():
     device = evdev.InputDevice(TOUCH_DEVICE)
@@ -218,7 +219,8 @@ def setup_touch_listener():
         elif event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_TOUCH and event.value == 1:
             x, y = scale_touch(raw_x, raw_y)
             print(f"[DEBUG][SETUP] Touch at x={x}, y={y}")
-            handle_setup_touch(x, y)
+            if handle_setup_touch(x, y):  # <--- If button was hit, exit immediately
+                break
 
 # ==== DASHBOARD <--> SETUP MODE SWITCH ====
 def switch_to_setup():
@@ -228,6 +230,9 @@ def switch_to_setup():
 def switch_to_dashboard():
     print(">>> Returning to DASHBOARD mode!")
     ui_mode['dashboard'] = True
+
+
+
 
 # ==== DOUBLE-TAP DETECTOR THREAD ====
 def double_tap_detector(trigger_callback):
