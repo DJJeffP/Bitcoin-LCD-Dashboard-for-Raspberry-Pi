@@ -11,7 +11,7 @@ FRAMEBUFFER = "/dev/fb1"
 WIDTH, HEIGHT = 480, 320
 TOUCH_DEVICE = '/dev/input/event0'
 CALIBRATION_FILE = "touch_calibration.json"
-DEBUG = True  # Set to True for debug prints/crosshair
+DEBUG = False  # Set to True for debug prints/crosshair
 
 # ==== Fonts ====
 FONT_BIG = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -299,14 +299,17 @@ def draw_coin_toggle_list(coins, scroll=0, search_text="", search_focused=False)
     draw = ImageDraw.Draw(image)
     font = ImageFont.truetype(FONT_SMALL, 26)
     font_search = ImageFont.truetype(FONT_SMALL, 24)
+    
     # Title
     draw.rectangle([0, 0, WIDTH, 55], fill=(50,50,90))
     draw.text((20, 10), "SETUP: Toggle/Search", fill=(255,255,255), font=font)
+    
     # Search bar
     draw.rectangle([20, 55, WIDTH-20, 95], fill=(60,60,100))
     draw.text((30, 65), f"Search: {search_text}", fill=(255,255,255), font=font_search)
     if search_focused:
         draw.rectangle([18, 53, WIDTH-18, 97], outline=(80,255,80), width=2)
+    
     # Coin list (max 6 on screen, scrolling)
     for i, coin in enumerate(visible):
         y = 105 + i*40
@@ -315,6 +318,16 @@ def draw_coin_toggle_list(coins, scroll=0, search_text="", search_focused=False)
         draw.rectangle(toggle_box, fill=fill)
         text = f"{coin['symbol']} - {coin['name']}"
         draw.text((80, y), text, fill=(255,255,255), font=font)
+
+    # Up scroll arrow (top right, above coin list)
+    scroll_up_x = WIDTH - 60
+    scroll_up_y = 105
+    draw.polygon([(scroll_up_x, scroll_up_y), (scroll_up_x+30, scroll_up_y), (scroll_up_x+15, scroll_up_y-20)], fill=(255,255,255))
+    # Down scroll arrow (bottom right, below coin list)
+    scroll_down_x = WIDTH - 60
+    scroll_down_y = 105 + 6*40
+    draw.polygon([(scroll_down_x, scroll_down_y), (scroll_down_x+30, scroll_down_y), (scroll_down_x+15, scroll_down_y+20)], fill=(255,255,255))
+
     # Save button at bottom right
     save_left = WIDTH - 180
     save_right = WIDTH - 50
@@ -330,19 +343,24 @@ def draw_coin_toggle_list(coins, scroll=0, search_text="", search_focused=False)
             "ZXCVBNM<-"
         ]
         key_w = 38
+        total_key_row_width = 10 * key_w + 9 * 4  # 10 keys, 9 spaces, per row
+        key_start_x = (WIDTH - total_key_row_width) // 2
         key_h = 38
         key_start_y = HEIGHT-160
         for row_idx, row in enumerate(keys):
             yk = key_start_y + row_idx * (key_h + 4)
             for col_idx, char in enumerate(row):
-                xk = 200 + col_idx * (key_w + 4)
+                xk = key_start_x + col_idx * (key_w + 4)
                 draw.rectangle([xk, yk, xk+key_w, yk+key_h], fill=(80,80,80))
                 draw.text((xk+10, yk+8), char, font=font_search, fill=(255,255,255))
+
+    
     # Scroll buttons
     if scroll > 0:
         draw.polygon([(WIDTH-60,110), (WIDTH-30,110), (WIDTH-45,90)], fill=(255,255,255))
     if scroll+6 < len(matches):
         draw.polygon([(WIDTH-60,340), (WIDTH-30,340), (WIDTH-45,360)], fill=(255,255,255))
+    
     # Rotate for LCD
     image = image.rotate(180)
     rgb565 = bytearray()
@@ -409,13 +427,16 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
                 print(f"[SETUP] Toggled {coin['symbol']}, now show={coins[orig_idx]['show']}")
                 return False, scroll, search_text, False
 
-    # 5. Scroll up
-    if (WIDTH-60) <= x <= (WIDTH-30) and 90 <= y <= 120 and scroll > 0:
-        return False, scroll-1, search_text, search_focused
+    # 5. Scroll up button
+    if (WIDTH - 60) <= x <= (WIDTH - 30) and (105-20) <= y <= (105+10):
+        if scroll > 0:
+            return False, scroll-1, search_text, search_focused
 
-    # 6. Scroll down
-    if (WIDTH-60) <= x <= (WIDTH-30) and 340 <= y <= 360 and (scroll+6) < len(matches):
-        return False, scroll+1, search_text, search_focused
+    # 6. Scroll down button
+    if (WIDTH - 60) <= x <= (WIDTH - 30) and (105+6*40) <= y <= (105+6*40+20):
+        if (scroll+6) < len(matches):
+            return False, scroll+1, search_text, search_focused
+
 
     # 7. Click anywhere else: remove focus from search
     return False, scroll, search_text, False
