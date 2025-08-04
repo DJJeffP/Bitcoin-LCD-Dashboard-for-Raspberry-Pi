@@ -145,6 +145,19 @@ def update_coin_value_area_variable(coin_symbol, coin_value, coin_color=(255,255
         box_x, box_y = min_x, min_y
         box_w, box_h = max_x - min_x, max_y - min_y
 
+    # Begrens box binnen het scherm:
+    if box_x < 0:
+        box_x = 0
+    if box_y < 0:
+        box_y = 0
+    if box_x + box_w > WIDTH:
+        box_w = WIDTH - box_x
+    if box_y + box_h > HEIGHT:
+        box_h = HEIGHT - box_y
+    if box_w <= 0 or box_h <= 0:
+        return  # Skip deze draw, want onzichtbaar of fout
+
+
     # Sla nieuwe box op voor de volgende iteratie
     _prev_coin_box = (box_x, box_y, box_w, box_h)
 
