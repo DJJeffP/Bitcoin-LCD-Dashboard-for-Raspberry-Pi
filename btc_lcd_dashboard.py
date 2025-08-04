@@ -414,7 +414,8 @@ def handle_setup_touch(x, y, coins, scroll, search_text, search_focused, matches
         if i < len(matches):
             coin = matches[scroll+i]
             text = f"{coin['symbol']} - {coin['name']}"
-            text_w, _ = font.getsize(text)
+            text_bbox = font.getbbox(text)
+            text_w = text_bbox[2] - text_bbox[0]
             x_name_start = 80
             x_name_end = x_name_start + text_w
             toggle_box_x1 = 30
