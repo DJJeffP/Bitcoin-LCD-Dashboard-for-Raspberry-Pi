@@ -11,6 +11,7 @@ FRAMEBUFFER = "/dev/fb1"
 WIDTH, HEIGHT = 480, 320
 TOUCH_DEVICE = '/dev/input/event0'
 CALIBRATION_FILE = "touch_calibration.json"
+DEBUG = True  # Set to True for debug prints/crosshair
 
 # ==== Fonts ====
 FONT_BIG = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -28,6 +29,27 @@ def clear_framebuffer():
         f.write(bytearray([0x00, 0x00] * WIDTH * HEIGHT))
 
 # ==== Touchscreen Calibration ====
+def draw_debug_crosshair(x, y, msg=""):
+    image = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    size = 18
+    draw.line([(x-size, y), (x+size, y)], fill=(0,255,0), width=3)
+    draw.line([(x, y-size), (x, y+size)], fill=(0,255,0), width=3)
+    if msg:
+        font = ImageFont.truetype(FONT_SMALL, 24)
+        draw.text((10, HEIGHT-35), msg, fill=(255,255,0), font=font)
+    image = image.rotate(180)
+    rgb565 = bytearray()
+    for pixel in image.getdata():
+        r = pixel[0] >> 3
+        g = pixel[1] >> 2
+        b = pixel[2] >> 3
+        value = (r << 11) | (g << 5) | b
+        rgb565.append(value & 0xFF)
+        rgb565.append((value >> 8) & 0xFF)
+    with open(FRAMEBUFFER, 'wb') as f:
+        f.write(rgb565)
+
 def draw_crosshair(x, y, msg=""):
     image = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
     draw = ImageDraw.Draw(image)
@@ -408,7 +430,9 @@ def setup_touch_listener(coins):
                 elif event.value == 0 and finger_down:
                     finger_down = False
                     x, y = scale_touch(raw_x, raw_y)
-                    print(f"[DEBUG][SETUP] Touch at x={x}, y={y} (on finger UP)")
+                    if DEBUG:
+                        draw_debug_crosshair(x, y, f"({x}, {y})")
+                        print(f"[DEBUG][SETUP] Touch at x={x}, y={y} (on finger UP)")
                     should_exit, scroll, search_text, search_focused = handle_setup_touch(
                         x, y, coins, scroll, search_text, search_focused, matches, font)
                     if should_exit:
@@ -438,7 +462,8 @@ def double_tap_detector(trigger_callback):
                 raw_y = event.value
         elif event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_TOUCH and event.value == 1:
             x, y = scale_touch(raw_x, raw_y)
-            print(f"[DEBUG] Touch at x={x}, y={y}")
+            if DEBUG:
+                print(f"[DEBUG] Touch at x={x}, y={y}")
             now = time.time()
             if is_in_clock_area(x, y):
                 if last_tap_time and (now - last_tap_time < DOUBLE_TAP_MAX_INTERVAL):
