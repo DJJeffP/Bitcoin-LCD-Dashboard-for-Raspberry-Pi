@@ -2,6 +2,11 @@
 
 Een Python dashboard voor het tonen van Bitcoin en andere coin-prijzen op een Raspberry Pi met 480x320 LCD + touchscreen.
 
+### This is still a work in progress and by far from finished. Come back later for a finished programm. Let me cook first ;)
+But you can always test it your self and take a look how far I am. Some functions are working some are still a work in progress.
+
+
+
 ## Features
 
 * Kalibratie van de touchscreen bij eerste opstart
