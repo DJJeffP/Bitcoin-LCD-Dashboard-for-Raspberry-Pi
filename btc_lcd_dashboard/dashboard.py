@@ -1,7 +1,6 @@
 # dashboard.py
 """
-Dashboard met snelle overlays: alleen klok en coin value box worden geüpdatet als overlay!
-Achtergrond blijft altijd in originele orientatie, rotatie alleen direct voor framebuffer.
+Dashboard met overlays: klok en coin value box als overlay, coin value box altijd gecentreerd onder BTC!
 """
 
 import os
@@ -13,17 +12,11 @@ FRAMEBUFFER = "/dev/fb1"
 BG_FOLDER = "backgrounds"
 BG_FALLBACK = os.path.join(BG_FOLDER, "btc-bg.png")
 
-# Klok rechtsboven, evt. X naar links als je wilt
+# Klok rechtsboven
 CLOCK_X = 270
 CLOCK_Y = 10
 CLOCK_W = 200
 CLOCK_H = 55
-
-# Coin value box rechtsonder
-COIN_BOX_X = 240
-COIN_BOX_Y = 230
-COIN_BOX_W = 210
-COIN_BOX_H = 70
 
 # Fonts
 FONT_BIG = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -42,7 +35,8 @@ def hex_to_rgb(hex_color, fallback=(247,147,26)):
 
 def draw_dashboard(btc_price, btc_color, coin, coin_price):
     """
-    Tekent alleen de statische achtergrond, BTC naam/waarde, géén overlay coin box en geen klok!
+    Tekent statische achtergrond + BTC (naam en prijs).
+    Coin value box en klok worden apart ge-overlayed!
     """
     coin_id = coin["id"]
     coin_bg = os.path.join(BG_FOLDER, f"{coin_id}-bg.png")
@@ -51,19 +45,26 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
     full_bg = Image.open(coin_bg).convert("RGB").resize((WIDTH, HEIGHT))
     draw = ImageDraw.Draw(full_bg)
 
-    # BTC label en prijs (midden)
+    # BTC label en prijs (midden, zoals origineel)
     label = "BTC"
     price_text = "$" + (str(btc_price) if btc_price is not None else "N/A")
     right_offset = 60
     btc_color_rgb = btc_color
+
+    # Nieuwe manier om exacte y/hoogte voor overlay te hergebruiken
     label_w, label_h = draw.textbbox((0, 0), label, font=font_main)[2:]
     price_w, price_h = draw.textbbox((0, 0), price_text, font=font_value)[2:]
     btc_label_y = int(HEIGHT * 0.35) - label_h
     btc_price_y = btc_label_y + label_h + 5
+
+    # Sla voor overlays op in globals
+    global _btc_price_y, _btc_price_h
+    _btc_price_y = btc_price_y
+    _btc_price_h = price_h
+
     draw.text(((WIDTH - label_w)//2 + right_offset, btc_label_y), label, font=font_main, fill=btc_color_rgb)
     draw.text(((WIDTH - price_w)//2 + right_offset, btc_price_y), price_text, font=font_value, fill=(255,255,255))
 
-    # Bewaar bg voor overlays
     global _full_bg_cache
     _full_bg_cache = full_bg.copy()
 
@@ -82,13 +83,12 @@ def draw_dashboard(btc_price, btc_color, coin, coin_price):
 
 def update_clock_area(btc_color=(247,147,26)):
     """
-    Overlay de klok rechtsboven als losse block met oranje datum.
+    Overlay klok rechtsboven, oranje datum.
     """
     global _full_bg_cache
     if '_full_bg_cache' not in globals():
         return
 
-    # Copy uit originele bg
     img = _full_bg_cache.crop((CLOCK_X, CLOCK_Y, CLOCK_X + CLOCK_W, CLOCK_Y + CLOCK_H))
     draw = ImageDraw.Draw(img)
     t = time.localtime()
@@ -120,27 +120,43 @@ def update_clock_area(btc_color=(247,147,26)):
             end = start + CLOCK_W * 2
             f.write(rgb565[start:end])
 
-def update_coin_value_area(coin_symbol, coin_value, coin_color=(255,255,255)):
+def update_coin_value_area_centered(coin_symbol, coin_value, coin_color=(255,255,255)):
     """
-    Overlay coin value box rechts onderin met naam in kleur en waarde in wit.
+    Overlay coin value box gecentreerd onder BTC, altijd zichtbaar!
     """
-    global _full_bg_cache
+    global _full_bg_cache, _btc_price_y, _btc_price_h
     if '_full_bg_cache' not in globals():
         return
+    if '_btc_price_y' not in globals() or '_btc_price_h' not in globals():
+        # fallback naar vaste plek
+        btc_price_y = 170
+        btc_price_h = 48
+    else:
+        btc_price_y = _btc_price_y
+        btc_price_h = _btc_price_h
 
-    img = _full_bg_cache.crop((COIN_BOX_X, COIN_BOX_Y, COIN_BOX_X + COIN_BOX_W, COIN_BOX_Y + COIN_BOX_H))
+    # Box placement dynamisch onder BTC, altijd midden, hoogte genoeg voor 2 regels
+    BOX_W = 280
+    BOX_H = 80
+    BOX_X = (WIDTH - BOX_W)//2
+    BOX_Y = btc_price_y + btc_price_h + 20
+
+    if BOX_Y + BOX_H > HEIGHT:
+        BOX_Y = HEIGHT - BOX_H - 10
+
+    img = _full_bg_cache.crop((BOX_X, BOX_Y, BOX_X + BOX_W, BOX_Y + BOX_H))
     draw = ImageDraw.Draw(img)
 
     symbol_text = coin_symbol.upper()
     value_text = "$" + (str(coin_value) if coin_value is not None else "N/A")
 
     symbol_w, symbol_h = draw.textbbox((0,0), symbol_text, font=font_main)[2:]
-    symbol_x = (COIN_BOX_W - symbol_w)//2
-    symbol_y = 0
+    symbol_x = (BOX_W - symbol_w)//2
+    symbol_y = 5
 
     value_w, value_h = draw.textbbox((0,0), value_text, font=font_value)[2:]
-    value_x = (COIN_BOX_W - value_w)//2
-    value_y = symbol_y + symbol_h + 4
+    value_x = (BOX_W - value_w)//2
+    value_y = symbol_y + symbol_h + 5
 
     draw.text((symbol_x, symbol_y), symbol_text, font=font_main, fill=coin_color)
     draw.text((value_x, value_y), value_text, font=font_value, fill=(255,255,255))
@@ -155,13 +171,13 @@ def update_coin_value_area(coin_symbol, coin_value, coin_color=(255,255,255)):
         rgb565.append(val & 0xFF)
         rgb565.append((val >> 8) & 0xFF)
 
-    fb_x = WIDTH - COIN_BOX_X - COIN_BOX_W
-    fb_y = HEIGHT - COIN_BOX_Y - COIN_BOX_H
+    fb_x = WIDTH - BOX_X - BOX_W
+    fb_y = HEIGHT - BOX_Y - BOX_H
     fb_offset = (fb_y * WIDTH + fb_x) * 2
 
     with open(FRAMEBUFFER, "r+b") as f:
-        for row in range(COIN_BOX_H):
+        for row in range(BOX_H):
             f.seek(fb_offset + row * WIDTH * 2)
-            start = row * COIN_BOX_W * 2
-            end = start + COIN_BOX_W * 2
+            start = row * BOX_W * 2
+            end = start + BOX_W * 2
             f.write(rgb565[start:end])

@@ -83,13 +83,13 @@ def main():
                 last_coin_val_str = ""
                 last_clock_str = ""
 
-            # **Altijd overlay coin box als symbool of waarde wijzigt**
+            # Overlay coin value box elke keer als coin verandert of waarde wijzigt:
             if coin_symbol != last_coin_symbol or coin_val_str != last_coin_val_str or redraw_full:
-                update_coin_value_area(coin_symbol, show_coin_price, coin_color)
+                update_coin_value_area_centered(coin_symbol, show_coin_price, coin_color)
                 last_coin_symbol = coin_symbol
                 last_coin_val_str = coin_val_str
 
-            # **Overlay klok altijd als tijd wijzigt**
+            # Overlay klok:
             if now_str != last_clock_str or redraw_full:
                 update_clock_area(btc_color)
                 last_clock_str = now_str
