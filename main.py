@@ -47,7 +47,14 @@ def main():
     calib = load_calibration()
     clear_framebuffer()
     coins = reload_coins()
-    btc_coin = next(c for c in coins if c["id"] == "btc")
+    ## Get BTC Coin info from json 
+    btc_coin = next((c for c in coins if c["id"] == "btc"), None)
+    if btc_coin is None:
+        # Fallback: voeg een dummy BTC coin toe (optioneel log melding)
+        btc_coin = {"id": "btc", "symbol": "BTC", "color": "#f7931a", "show": True}
+        coins.insert(0, btc_coin)
+        print("WARNING: No BTC coin found in coins.json, using fallback BTC.")
+
     btc_color = hex_to_rgb(btc_coin["color"])
 
     t_price = threading.Thread(target=price_updater, args=(coins,), daemon=True)
