@@ -234,8 +234,11 @@ def setup_touch_listener():
 
 # ==== DASHBOARD <--> SETUP MODE SWITCH ====
 def switch_to_setup():
+    if not ui_mode['dashboard']:
+        return
     print(">>> Switching to SETUP mode!")
     ui_mode['dashboard'] = False
+
 
 def switch_to_dashboard():
     print(">>> Returning to DASHBOARD mode!")
